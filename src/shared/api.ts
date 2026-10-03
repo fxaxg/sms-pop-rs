@@ -30,6 +30,7 @@ export interface NotificationOptions {
 export interface CaretOptions {
   enabled: boolean;
   duration_seconds: number;
+  watch_seconds: number;
   gap: number;
 }
 

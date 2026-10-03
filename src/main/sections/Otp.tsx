@@ -49,6 +49,15 @@ export function Otp({ config, update }: Props) {
             onChange={(value) => update((d) => void (d.otp.caret.duration_seconds = value))}
           />
         </Row>
+        <Row label="监听窗口" hint="收到验证码后，这段时间内点进输入框仍会弹出候选条">
+          <NumberField
+            value={otp.caret.watch_seconds}
+            min={5}
+            max={600}
+            suffix="秒"
+            onChange={(value) => update((d) => void (d.otp.caret.watch_seconds = value))}
+          />
+        </Row>
         <Row label="与光标间距" hint="默认 24，给中文输入法的候选窗留位置">
           <NumberField
             value={otp.caret.gap}

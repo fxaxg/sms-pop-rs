@@ -1,17 +1,20 @@
 //! 光标候选条。
 //!
-//! 收到验证码时探测一下焦点：光标落在可写输入框里，就在光标旁冒出一个
-//! 「填入 xxxxxx」的小条。**只有用户点它才会写入**（`smspop-uia` 的纪律）。
+//! 收到验证码后开一个 **N 秒监听窗**（`caret.watch_seconds`）：期间每 350ms
+//! 探测一次焦点，首次发现光标落进可写输入框就把「填入 xxxxxx」弹到光标旁。
+//! —— 用户经常是收到通知才去点输入框，只认到达瞬间的焦点会漏掉大多数场景。
+//!
+//! **只有用户点它才会写入**（`smspop-uia` 的纪律）。
 //!
 //! 窗口只有一个（label = `caret`），反复 hide/show。前端量好自身尺寸后
 //! 调 `caret_layout`，Rust 用 `placement::compute` 定最终位置再显示。
 
 use std::sync::atomic::Ordering;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use log::{info, warn};
 use smspop_core::placement::{self, PixelRect, RectD};
-use smspop_uia::ProbeOutcome;
+use smspop_uia::{FocusTarget, ProbeOutcome};
 use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewUrl,
     WebviewWindow, WebviewWindowBuilder,
@@ -27,53 +30,108 @@ use crate::types::{CaretLayout, CaretOffer};
 /// 探测焦点框的超时。卡住只是「这次不给候选」，绝不能拖住通知链路。
 const PROBE_TIMEOUT: Duration = Duration::from_millis(900);
 
+/// 监听窗内的探测间隔。
+const WATCH_INTERVAL: Duration = Duration::from_millis(350);
+
 /// 写入的超时。
 const INSERT_TIMEOUT: Duration = Duration::from_millis(1500);
 
 const WINDOW_LABEL: &str = "caret";
 const EDGE_PADDING: f64 = 8.0;
 
-/// 收到验证码：探测焦点，合适就把候选条递出去。
-pub fn offer(app: &AppHandle, code: String) {
+/// 收到验证码：开一个监听窗，等焦点落进输入框再弹候选条。
+///
+/// 立即返回（监听跑在独立线程上）。新的验证码会取代旧的监听。
+pub fn watch(app: &AppHandle, code: String) {
     let state = app.state::<AppState>();
     let config = state.config();
 
-    let uia_guard = state
-        .uia
-        .read()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let Some(uia) = uia_guard.as_ref() else {
-        return;
-    };
+    if state.uia.read().unwrap().is_none() {
+        return; // UIA 不可用，候选功能整体缺席
+    }
 
-    let target = match uia.probe(PROBE_TIMEOUT) {
-        ProbeOutcome::Found(target) => target,
-        ProbeOutcome::TimedOut => {
-            info!("焦点探测超时，这次不给候选");
+    let window_secs = u64::from(config.otp.caret.watch_seconds).clamp(5, 600);
+    let duration_secs = config.otp.caret.duration_seconds;
+    let gap = config.otp.caret.gap;
+
+    // 涨代数：取消上一个监听、作废当前候选条
+    let generation = state.caret_generation.fetch_add(1, Ordering::SeqCst) + 1;
+    hide_window(app);
+
+    let app = app.clone();
+    let _ = std::thread::Builder::new()
+        .name("caret-watch".to_string())
+        .spawn(move || {
+            watch_loop(&app, generation, code, window_secs, duration_secs, gap);
+        });
+}
+
+/// 监听循环：每 350ms 探测一次，首次命中可写焦点就弹条。
+///
+/// 一条验证码只主动弹一次 —— 没点到就用剪贴板（通知到达时已自动复制）。
+fn watch_loop(
+    app: &AppHandle,
+    generation: u64,
+    code: String,
+    window_secs: u64,
+    duration_secs: u32,
+    gap: f64,
+) {
+    let deadline = Instant::now() + Duration::from_secs(window_secs);
+
+    loop {
+        if Instant::now() >= deadline {
             return;
         }
-        ProbeOutcome::Failed(error) => {
-            warn!("焦点探测失败：{error}");
+
+        // 被新验证码取代 / 用户手动收起 → 退出
+        if current_generation(app) != generation {
             return;
         }
-    };
 
-    if !target.editable {
-        info!("焦点不可写，不给候选：{}", target.describe());
+        let outcome = {
+            let state = app.state::<AppState>();
+            let guard = state.uia.read().unwrap();
+            guard.as_ref().map(|uia| uia.probe(PROBE_TIMEOUT))
+        };
+
+        match outcome {
+            Some(ProbeOutcome::Found(target)) if target.editable && target.caret.is_some() => {
+                show_bar(app, generation, code, target, duration_secs, gap);
+                return;
+            }
+            // UIA 挂了（worker 退出）—— 再轮询也没意义
+            Some(ProbeOutcome::Failed(error)) => {
+                warn!("焦点探测失败：{error}");
+                return;
+            }
+            _ => {}
+        }
+
+        std::thread::sleep(WATCH_INTERVAL);
+    }
+}
+
+/// 把候选条递出去（此时已经确认焦点可写、光标位置已知）。
+fn show_bar(
+    app: &AppHandle,
+    generation: u64,
+    code: String,
+    target: FocusTarget,
+    duration_secs: u32,
+    gap: f64,
+) {
+    let state = app.state::<AppState>();
+
+    // 显示前再确认一次没被取代
+    if current_generation(app) != generation {
         return;
     }
 
-    let Some(caret_rect) = target.caret else {
-        info!("拿不到光标位置，不给候选：{}", target.describe());
-        return;
-    };
-
+    let caret_rect = target.caret.expect("调用前已确认 caret 存在");
     let dpi = target.dpi.max(96);
     let caret_dips = caret_rect.to_dips(dpi);
     let work_area = work_area_dips(caret_rect, dpi);
-    let scale = dpi as f64 / 96.0;
-
-    let generation = state.caret_generation.fetch_add(1, Ordering::SeqCst) + 1;
 
     {
         let mut offer = state.caret_offer.lock().unwrap();
@@ -82,9 +140,9 @@ pub fn offer(app: &AppHandle, code: String) {
             code,
             caret: caret_dips,
             work_area,
-            scale,
-            gap: config.otp.caret.gap,
-            duration_secs: config.otp.caret.duration_seconds,
+            scale: dpi as f64 / 96.0,
+            gap,
+            duration_secs,
         });
     }
 
@@ -98,9 +156,11 @@ pub fn offer(app: &AppHandle, code: String) {
         let _ = window.emit(crate::types::EVENT_CARET_OFFER, generation);
     }
 
+    info!("候选条已递出（dpi={dpi}）");
+
     // 超时自动消失
     let app_for_timer = app.clone();
-    let duration = u64::from(config.otp.caret.duration_seconds).max(2);
+    let duration = u64::from(duration_secs).max(2);
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(duration)).await;
         hide_if_generation(&app_for_timer, generation);
@@ -132,6 +192,7 @@ pub fn layout(app: &AppHandle, request: CaretLayout) {
         EDGE_PADDING,
     );
 
+    // placement 在 DIP 空间里算，换回物理像素喂给窗口。
     let scale = offer.scale;
     let x = (left * scale) as i32;
     let y = (top * scale) as i32;
@@ -176,13 +237,19 @@ pub fn insert(app: &AppHandle, generation: u64) -> Option<(bool, String)> {
     Some((outcome.success, outcome.message))
 }
 
-/// 收起候选条（用户点完 / 超时 / 点了别处）。
+/// 收起候选条（用户点完 / 超时 / 新验证码取代）。同时取消在途的监听。
 pub fn hide(app: &AppHandle) {
-    let state = app.state::<AppState>();
+    // 涨代数，让在途的定时器、布局请求和监听线程全部失效
+    app.state::<AppState>()
+        .caret_generation
+        .fetch_add(1, Ordering::SeqCst);
 
-    // 涨代数，让在途的定时器和布局请求失效
-    state.caret_generation.fetch_add(1, Ordering::SeqCst);
-    *state.caret_offer.lock().unwrap() = None;
+    hide_window(app);
+}
+
+/// 只收窗口，不动代数（watch 内部换代时自己先涨过代数了）。
+fn hide_window(app: &AppHandle) {
+    *app.state::<AppState>().caret_offer.lock().unwrap() = None;
 
     if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
         let _ = window.hide();
@@ -190,14 +257,17 @@ pub fn hide(app: &AppHandle) {
 }
 
 fn hide_if_generation(app: &AppHandle, generation: u64) {
-    let state = app.state::<AppState>();
-
-    let current = state.caret_generation.load(Ordering::SeqCst);
-    if current != generation {
+    if current_generation(app) != generation {
         return; // 期间来了新提议，别动
     }
 
     hide(app);
+}
+
+fn current_generation(app: &AppHandle) -> u64 {
+    app.state::<AppState>()
+        .caret_generation
+        .load(Ordering::SeqCst)
 }
 
 /// 懒创建候选条窗口。

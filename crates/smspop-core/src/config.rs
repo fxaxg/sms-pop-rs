@@ -136,6 +136,11 @@ pub struct CaretOptions {
     /// 候选条停留秒数，过了还没点就自己消失。
     pub duration_seconds: u32,
 
+    /// 收到验证码后，多久之内「焦点落进输入框」还会弹出候选条（秒）。
+    ///
+    /// 用户经常是收到通知才去点输入框，所以不能只认到达瞬间的焦点。
+    pub watch_seconds: u32,
+
     /// 候选条与光标之间的间距（DIP）。
     ///
     /// 默认 **24** 而不是 6：中文输入法的候选窗也在光标正下方，
@@ -148,6 +153,7 @@ impl Default for CaretOptions {
         Self {
             enabled: true,
             duration_seconds: 8,
+            watch_seconds: 60,
             gap: 24.0,
         }
     }
@@ -313,6 +319,8 @@ pub const DEFAULT_CONFIG_JSON: &str = r#"{
       "enabled": true,
       // 候选条停留秒数
       "duration_seconds": 8,
+      // 收到验证码后多久之内，焦点落进输入框还会弹出候选条（秒）
+      "watch_seconds": 60,
       // 与光标之间的间距。那个 24 是故意的：中文输入法的候选窗也在
       // 光标正下方，间距太小会被它挡住。嫌远可以调小。
       "gap": 24.0
