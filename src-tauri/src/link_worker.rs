@@ -120,11 +120,10 @@ pub fn dispatch_notification(app: &AppHandle, notification: PhoneNotification) {
     }
 
     // ③ 光标候选条（点了才填入）。
-    //    探测最长要 900ms，别占着链路线程 —— 挪到旁边线程去做。
+    //    开 N 秒监听窗：等焦点落进输入框再弹，而不是只认到达瞬间。
     if offer_otp && config.otp.caret.enabled {
         if let Some(code) = notification.code.clone() {
-            let app = app.clone();
-            std::thread::spawn(move || caret::offer(&app, code));
+            caret::watch(app, code);
         }
     }
 }
