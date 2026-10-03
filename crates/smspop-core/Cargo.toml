@@ -1,0 +1,15 @@
+[package]
+name = "smspop-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SmsPop 的纯逻辑层：ANCS 协议、验证码提取、过滤、去重、写入策略、候选条几何"
+
+# ★ 这一层刻意**不依赖 Windows**。
+#   项目里最容易写错的就是这几个文件（字节级协议解析、写别人输入框的规则），
+#   把它们钉成零平台依赖，就能永远用 `cargo test` 验证，
+#   不需要蓝牙、不需要桌面、也不会被 COM 或消息循环的问题干扰。
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

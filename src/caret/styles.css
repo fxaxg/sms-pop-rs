@@ -1,0 +1,66 @@
+/* 光标候选条 */
+
+html,
+body {
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  /* 给圆角阴影留出呼吸空间：量尺寸时会把这部分也算进去。
+     没有这段 padding，阴影（尤其是下方 8px 的投影）会被窗口边缘裁掉。 */
+  padding: 10px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+  animation: pill-in 0.16s ease-out;
+}
+
+@keyframes pill-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pill:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.pill-code {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 1px 7px;
+  border-radius: 6px;
+}
+
+.pill.done {
+  background: var(--success);
+}
+
+.pill.failed {
+  background: var(--danger);
+}
+
+.pill:disabled {
+  opacity: 0.8;
+  cursor: default;
+}

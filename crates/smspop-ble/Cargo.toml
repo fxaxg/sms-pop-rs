@@ -1,0 +1,29 @@
+[package]
+name = "smspop-ble"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SmsPop 的 Windows 蓝牙层：ANCS 广播、GATT 服务端、订阅与通知回读"
+
+# ★ 这里是 ANCS 角色交叉的地方，记一下免得以后自己看晕：
+#     iPhone = 链路层 Central + GATT Server
+#     本机   = 链路层 Peripheral + GATT Client
+#   所以我们要**既广播又当 GATT 服务端**（为了能被连上），
+#   同时又要当 GATT 客户端去订阅 iPhone 的 ANCS 服务。
+
+[dependencies]
+smspop-core = { path = "../smspop-core" }
+
+windows = { workspace = true, features = [
+    "Foundation",
+    "Foundation_Collections",
+    "Storage_Streams",
+    "Devices_Bluetooth",
+    "Devices_Bluetooth_Advertisement",
+    "Devices_Bluetooth_GenericAttributeProfile",
+    "Devices_Enumeration",
+    "Win32_System_Com",
+] }
+
+pollster = { workspace = true }
+log = { workspace = true }
