@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import {
+  getConfig,
   getToastPayload,
   toastClick,
   toastClose,
   toastResize,
   type ToastPayload,
 } from "../shared/api";
+import { dict, resolveLang, type Lang } from "../shared/i18n";
 
 /**
  * 右下角通知弹窗。
@@ -16,8 +18,13 @@ import {
 export function ToastApp() {
   const [payload, setPayload] = useState<ToastPayload | null>(null);
   const [copied, setCopied] = useState(false);
+  const [lang, setLang] = useState<Lang>("zh");
 
   useEffect(() => {
+    getConfig()
+      .then((config) => setLang(resolveLang(config.general.language)))
+      .catch(() => {});
+
     getToastPayload().then((payload) => {
       if (!payload) {
         // 没有负载（比如兜底定时器已把它清掉）→ 直接关
@@ -42,6 +49,8 @@ export function ToastApp() {
     return null;
   }
 
+  const t = dict(lang);
+
   const onClick = async () => {
     if (copied) return;
     const code = await toastClick().catch(() => null);
@@ -61,7 +70,7 @@ export function ToastApp() {
         <div className="toast-body">{payload.body}</div>
         {payload.code && (
           <div className={`toast-code ${copied ? "copied" : ""}`}>
-            {copied ? "✓ 已复制" : `点击复制 ${payload.code}`}
+            {copied ? t.toast.copied : t.toast.copyCode(payload.code)}
           </div>
         )}
       </div>
@@ -71,7 +80,7 @@ export function ToastApp() {
           event.stopPropagation();
           toastClose();
         }}
-        aria-label="关闭"
+        aria-label={t.toast.dismiss}
       >
         ×
       </button>

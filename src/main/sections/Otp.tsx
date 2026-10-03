@@ -1,4 +1,5 @@
 import type { Config, InsertMode } from "../../shared/api";
+import { useT } from "../../shared/i18n";
 import { NumberField, Row, Section, Toggle } from "../components";
 
 interface Props {
@@ -8,21 +9,19 @@ interface Props {
 
 /** 「验证码」页：识别、复制、候选条、填入方式。 */
 export function Otp({ config, update }: Props) {
+  const t = useT();
   const otp = config.otp;
 
   return (
     <>
-      <Section
-        title="验证码增强"
-        description="自动识别通知里的验证码。绝不自动填入 —— 只有你点候选条，验证码才会写进输入框。"
-      >
-        <Row label="启用验证码增强">
+      <Section title={t.otp.title} description={t.otp.desc}>
+        <Row label={t.otp.enabled}>
           <Toggle
             checked={otp.enabled}
             onChange={(value) => update((d) => void (d.otp.enabled = value))}
           />
         </Row>
-        <Row label="自动复制到剪贴板" hint="收到验证码就复制，随时可以手动粘贴">
+        <Row label={t.otp.autoCopy} hint={t.otp.autoCopyHint}>
           <Toggle
             checked={otp.auto_copy}
             onChange={(value) => update((d) => void (d.otp.auto_copy = value))}
@@ -30,35 +29,32 @@ export function Otp({ config, update }: Props) {
         </Row>
       </Section>
 
-      <Section
-        title="光标候选条"
-        description="收到验证码时，如果光标正好在输入框里，光标旁会出现「填入」按钮。"
-      >
-        <Row label="启用光标候选条">
+      <Section title={t.otp.caretTitle} description={t.otp.caretDesc}>
+        <Row label={t.otp.caretEnabled}>
           <Toggle
             checked={otp.caret.enabled}
             onChange={(value) => update((d) => void (d.otp.caret.enabled = value))}
           />
         </Row>
-        <Row label="停留时长">
+        <Row label={t.otp.caretDuration}>
           <NumberField
             value={otp.caret.duration_seconds}
             min={2}
             max={60}
-            suffix="秒"
+            suffix={t.common.seconds}
             onChange={(value) => update((d) => void (d.otp.caret.duration_seconds = value))}
           />
         </Row>
-        <Row label="监听窗口" hint="收到验证码后，这段时间内点进输入框仍会弹出候选条">
+        <Row label={t.otp.watchSeconds} hint={t.otp.watchSecondsHint}>
           <NumberField
             value={otp.caret.watch_seconds}
             min={5}
             max={600}
-            suffix="秒"
+            suffix={t.common.seconds}
             onChange={(value) => update((d) => void (d.otp.caret.watch_seconds = value))}
           />
         </Row>
-        <Row label="与光标间距" hint="默认 24，给中文输入法的候选窗留位置">
+        <Row label={t.otp.gap} hint={t.otp.gapHint}>
           <NumberField
             value={otp.caret.gap}
             min={0}
@@ -69,8 +65,8 @@ export function Otp({ config, update }: Props) {
         </Row>
       </Section>
 
-      <Section title="填入方式" description="绝大多数情况不用动这里。">
-        <Row label="模式" hint="direct 快且不要求焦点；simulate 适合顽固的输入框">
+      <Section title={t.otp.insertionTitle} description={t.otp.insertionDesc}>
+        <Row label={t.otp.mode} hint={t.otp.modeHint}>
           <select
             className="select"
             value={otp.insertion.mode}
@@ -78,12 +74,12 @@ export function Otp({ config, update }: Props) {
               update((d) => void (d.otp.insertion.mode = event.target.value as InsertMode))
             }
           >
-            <option value="direct">direct — 直接写入</option>
-            <option value="simulate">simulate — 模拟键盘</option>
+            <option value="direct">{t.otp.modeDirect}</option>
+            <option value="simulate">{t.otp.modeSimulate}</option>
           </select>
         </Row>
         {otp.insertion.mode === "simulate" && (
-          <Row label="逐字间隔">
+          <Row label={t.otp.typeDelay}>
             <NumberField
               value={otp.insertion.type_delay_ms}
               min={0}
