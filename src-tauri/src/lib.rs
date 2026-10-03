@@ -84,6 +84,7 @@ pub fn run() {
             commands::get_toast_payload,
             commands::toast_click,
             commands::toast_close,
+            commands::toast_resize,
             commands::get_caret_offer,
             commands::caret_layout,
             commands::caret_insert,

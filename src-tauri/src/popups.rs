@@ -2,6 +2,10 @@
 //!
 //! 每条通知是一个独立的小窗口：无边框、透明、置顶、不抢焦点。
 //! 堆叠在屏幕右下角，新的在最下面，超上限先关最旧的。
+//!
+//! **高度自适应**：窗口先按默认高度隐藏创建，前端渲染完内容后量出真实高度
+//! 调 `toast_resize` —— Rust 记录高度、重排堆叠、再把窗口显示出来。
+//! 内容两行三行都不会被裁。
 
 use std::sync::atomic::Ordering;
 use std::time::Duration;
@@ -9,14 +13,20 @@ use std::time::Duration;
 use log::{info, warn};
 use smspop_core::model::PhoneNotification;
 use tauri::{
-    AppHandle, Manager, PhysicalPosition, Position, WebviewUrl, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewUrl,
+    WebviewWindowBuilder, WindowEvent,
 };
 
 use crate::state::AppState;
 use crate::types::ToastPayload;
 
-/// toast 尺寸与间距（DIP；乘显示器缩放后换成物理像素）。
-const TOAST_HEIGHT: f64 = 96.0;
+/// 刚创建时的占位高度（DIP；马上会被前端报上来的真实高度替换）。
+const DEFAULT_HEIGHT: f64 = 96.0;
+
+/// 高度下限/上限（DIP）。上限防止超长通知占满屏幕。
+const MIN_HEIGHT: f64 = 56.0;
+const MAX_HEIGHT: f64 = 240.0;
+
 const MARGIN: f64 = 16.0;
 const GAP: f64 = 8.0;
 
@@ -55,14 +65,11 @@ pub fn show(app: &AppHandle, notification: &PhoneNotification) {
         .lock()
         .unwrap()
         .insert(label.clone(), payload);
-
-    let Some(monitor) = app.primary_monitor().ok().flatten() else {
-        warn!("拿不到主显示器，弹窗取消");
-        return;
-    };
-
-    let scale = monitor.scale_factor();
-    let _ = scale; // 尺寸用 DIP（窗口自己换算）；位置用物理像素（见 reposition_all）
+    state
+        .toast_heights
+        .lock()
+        .unwrap()
+        .insert(label.clone(), DEFAULT_HEIGHT);
 
     let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("toast.html".into()))
         .title("SmsPop")
@@ -75,7 +82,7 @@ pub fn show(app: &AppHandle, notification: &PhoneNotification) {
         .focusable(false)
         .focused(false)
         .resizable(false)
-        .inner_size(popup.width, TOAST_HEIGHT)
+        .inner_size(popup.width, DEFAULT_HEIGHT)
         .visible(false);
 
     let window = match builder.build() {
@@ -83,6 +90,7 @@ pub fn show(app: &AppHandle, notification: &PhoneNotification) {
         Err(error) => {
             warn!("创建 toast 窗口失败：{error}");
             state.pending_toasts.lock().unwrap().remove(&label);
+            state.toast_heights.lock().unwrap().remove(&label);
             return;
         }
     };
@@ -101,8 +109,8 @@ pub fn show(app: &AppHandle, notification: &PhoneNotification) {
         }
     });
 
+    // 先按占位高度摆好，但**不显示** —— 等前端报真实高度后再 show（见 resize_and_show）
     reposition_all(app);
-    let _ = window.show();
 
     // 兜底定时关闭（前端崩溃/事件丢失也不至于留着窗口）
     let app_for_timer = app.clone();
@@ -112,6 +120,32 @@ pub fn show(app: &AppHandle, notification: &PhoneNotification) {
         tokio::time::sleep(Duration::from_secs(duration)).await;
         close_toast(&app_for_timer, &label_for_timer);
     });
+}
+
+/// 前端量出了真实高度 → 记高度、改尺寸、重排、显示。
+pub fn resize_and_show(app: &AppHandle, label: &str, height_dip: f64) {
+    let height = height_dip.clamp(MIN_HEIGHT, MAX_HEIGHT);
+    let state = app.state::<AppState>();
+
+    state
+        .toast_heights
+        .lock()
+        .unwrap()
+        .insert(label.to_string(), height);
+
+    let Some(window) = app.get_webview_window(label) else {
+        return;
+    };
+
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let width = state.config().notifications.popup.width;
+    let _ = window.set_size(Size::Physical(PhysicalSize::new(
+        (width * scale).ceil() as u32,
+        (height * scale).ceil() as u32,
+    )));
+
+    reposition_all(app);
+    let _ = window.show();
 }
 
 /// 关掉一个 toast（用户点掉 / 超时 / 被挤掉）。
@@ -133,6 +167,7 @@ fn on_toast_destroyed(app: &AppHandle, label: &str) {
         .position(|item| item == label)
         .map(|index| open.remove(index));
     state.pending_toasts.lock().unwrap().remove(label);
+    state.toast_heights.lock().unwrap().remove(label);
     drop(open);
 
     if removed.is_some() {
@@ -140,7 +175,7 @@ fn on_toast_destroyed(app: &AppHandle, label: &str) {
     }
 }
 
-/// 按「最新的在最下面」重排所有 toast。
+/// 按「最新的在最下面」重排所有 toast（高度各算各的）。
 fn reposition_all(app: &AppHandle) {
     let state = app.state::<AppState>();
     let config = state.config();
@@ -152,21 +187,24 @@ fn reposition_all(app: &AppHandle) {
     let work_area = monitor.work_area();
     let scale = monitor.scale_factor();
     let width_px = (config.notifications.popup.width * scale) as i32;
-    let height_px = (TOAST_HEIGHT * scale) as i32;
     let margin_px = (MARGIN * scale) as i32;
     let gap_px = (GAP * scale) as i32;
 
     let open = state.toasts.lock().unwrap();
+    let heights = state.toast_heights.lock().unwrap();
 
-    for (slot, label) in open.iter().rev().enumerate() {
+    // 从底往上堆：最新的贴底，旧的依次往上
+    let mut bottom = work_area.position.y + work_area.size.height as i32 - margin_px;
+
+    for label in open.iter().rev() {
+        let height_px = (heights.get(label).copied().unwrap_or(DEFAULT_HEIGHT) * scale) as i32;
         let x = work_area.position.x + work_area.size.width as i32 - width_px - margin_px;
-        let y = work_area.position.y + work_area.size.height as i32
-            - margin_px
-            - (slot as i32 + 1) * height_px
-            - slot as i32 * gap_px;
+        let y = bottom - height_px;
 
         if let Some(window) = app.get_webview_window(label) {
             let _ = window.set_position(Position::Physical(PhysicalPosition::new(x, y)));
         }
+
+        bottom = y - gap_px;
     }
 }
