@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getConfig, saveConfig, type Config } from "../shared/api";
+import { LangContext, resolveLang, useT } from "../shared/i18n";
 import { Connection } from "./sections/Connection";
 import { Notifications } from "./sections/Notifications";
 import { Otp } from "./sections/Otp";
@@ -7,12 +8,12 @@ import { General } from "./sections/General";
 
 type Page = "connection" | "notifications" | "otp" | "general";
 
-const NAV: { key: Page; label: string; icon: string }[] = [
-  { key: "connection", label: "连接", icon: "📱" },
-  { key: "notifications", label: "通知", icon: "🔔" },
-  { key: "otp", label: "验证码", icon: "🔢" },
-  { key: "general", label: "通用", icon: "⚙️" },
-];
+const NAV_ICONS: Record<Page, string> = {
+  connection: "📱",
+  notifications: "🔔",
+  otp: "🔢",
+  general: "⚙️",
+};
 
 export function App() {
   const [page, setPage] = useState<Page>("connection");
@@ -50,6 +51,44 @@ export function App() {
     }
   };
 
+  const lang = resolveLang(config?.general.language ?? "auto");
+
+  return (
+    <LangContext.Provider value={lang}>
+      <Shell
+        page={page}
+        setPage={setPage}
+        config={config}
+        update={update}
+        dirty={dirty}
+        savedFlash={savedFlash}
+        error={error}
+        save={save}
+      />
+    </LangContext.Provider>
+  );
+}
+
+function Shell(props: {
+  page: Page;
+  setPage: (page: Page) => void;
+  config: Config | null;
+  update: (mutate: (draft: Config) => void) => void;
+  dirty: boolean;
+  savedFlash: boolean;
+  error: string | null;
+  save: () => void;
+}) {
+  const t = useT();
+  const { page, setPage, config, update, dirty, savedFlash, error, save } = props;
+
+  const nav: { key: Page; label: string }[] = [
+    { key: "connection", label: t.nav.connection },
+    { key: "notifications", label: t.nav.notifications },
+    { key: "otp", label: t.nav.otp },
+    { key: "general", label: t.nav.general },
+  ];
+
   return (
     <div className="layout">
       <aside className="sidebar">
@@ -64,13 +103,13 @@ export function App() {
           <span className="brand-name">SmsPop</span>
         </div>
         <nav>
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <button
               key={item.key}
               className={`nav-item ${page === item.key ? "active" : ""}`}
               onClick={() => setPage(item.key)}
             >
-              <span className="nav-icon">{item.icon}</span>
+              <span className="nav-icon">{NAV_ICONS[item.key]}</span>
               {item.label}
             </button>
           ))}
@@ -85,22 +124,22 @@ export function App() {
             {page === "connection" && <Connection />}
             {page === "notifications" && <Notifications config={config} update={update} />}
             {page === "otp" && <Otp config={config} update={update} />}
-            {page === "general" && <General />}
+            {page === "general" && <General config={config} update={update} />}
           </>
         ) : (
-          <p className="loading">载入配置…</p>
+          <p className="loading">{t.common.loading}</p>
         )}
       </main>
 
       {(dirty || savedFlash) && (
         <footer className="save-bar">
           {savedFlash ? (
-            <span className="saved-ok">✓ 已保存</span>
+            <span className="saved-ok">{t.common.saved}</span>
           ) : (
             <>
-              <span className="dirty-hint">有未保存的修改</span>
+              <span className="dirty-hint">{t.common.unsaved}</span>
               <button className="btn primary" onClick={save}>
-                保存
+                {t.common.save}
               </button>
             </>
           )}

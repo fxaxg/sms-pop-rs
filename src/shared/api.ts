@@ -51,6 +51,9 @@ export interface OtpOptions {
 export interface Config {
   notifications: NotificationOptions;
   otp: OtpOptions;
+  general: {
+    language: string; // "auto" | "zh" | "en"
+  };
 }
 
 export const getConfig = () => invoke<Config>("get_config");
