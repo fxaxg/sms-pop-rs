@@ -20,17 +20,31 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
         app.autolaunch().is_enabled().unwrap_or(false)
     };
 
-    let autostart_item = CheckMenuItemBuilder::with_id(MENU_AUTOSTART, "开机自启")
+    // 托盘文案跟随配置语言（auto 时暂定中文；主窗口语言选择是即时的，
+    // 托盘菜单重建成本不值得，重启后生效）。
+    let en = app.state::<AppState>().config().general.language == "en";
+    let (open_text, test_text, autostart_text, quit_text) = if en {
+        (
+            "Open SmsPop",
+            "Send test notification",
+            "Run at startup",
+            "Quit",
+        )
+    } else {
+        ("打开 SmsPop", "发送测试通知", "开机自启", "退出")
+    };
+
+    let autostart_item = CheckMenuItemBuilder::with_id(MENU_AUTOSTART, autostart_text)
         .checked(autostart_enabled)
         .build(app)?;
 
     let menu = MenuBuilder::new(app)
-        .item(&MenuItemBuilder::with_id(MENU_OPEN, "打开 SmsPop").build(app)?)
-        .item(&MenuItemBuilder::with_id(MENU_TEST, "发送测试通知").build(app)?)
+        .item(&MenuItemBuilder::with_id(MENU_OPEN, open_text).build(app)?)
+        .item(&MenuItemBuilder::with_id(MENU_TEST, test_text).build(app)?)
         .separator()
         .item(&autostart_item)
         .separator()
-        .item(&MenuItemBuilder::with_id(MENU_QUIT, "退出").build(app)?)
+        .item(&MenuItemBuilder::with_id(MENU_QUIT, quit_text).build(app)?)
         .build()?;
 
     // 菜单项句柄存起来，切换时要同步勾选状态
@@ -87,8 +101,24 @@ pub fn open_main_window(app: &AppHandle) {
 
 /// 链路状态变了 → 更新 tooltip。
 pub fn on_link_state(app: &AppHandle, state: LinkState) {
+    let en = app.state::<AppState>().config().general.language == "en";
+    let label = if en {
+        match state {
+            LinkState::Stopped => "Stopped",
+            LinkState::AdapterUnsupported => "Bluetooth unsupported",
+            LinkState::Advertising => "Waiting for iPhone",
+            LinkState::WaitingForConnection => "Waiting for link",
+            LinkState::Connected => "Connected",
+            LinkState::Subscribed => "Ready",
+            LinkState::Reconnecting => "Reconnecting",
+            LinkState::Faulted => "Error",
+        }
+    } else {
+        state.describe()
+    };
+
     if let Some(tray) = app.tray_by_id("main") {
-        let _ = tray.set_tooltip(Some(&format!("SmsPop — {}", state.describe())));
+        let _ = tray.set_tooltip(Some(&format!("SmsPop — {label}")));
     }
 }
 

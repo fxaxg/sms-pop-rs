@@ -4,12 +4,20 @@ import {
   openConfigDir,
   openLogsDir,
   setAutostart,
+  type Config,
   type SettingsMeta,
 } from "../../shared/api";
+import { useT } from "../../shared/i18n";
 import { Row, Section, Toggle } from "../components";
 
-/** 「通用」页：自启、文件位置、关于。 */
-export function General() {
+interface Props {
+  config: Config;
+  update: (mutate: (draft: Config) => void) => void;
+}
+
+/** 「通用」页：自启、语言、文件位置、关于。 */
+export function General({ config, update }: Props) {
+  const t = useT();
   const [meta, setMeta] = useState<SettingsMeta | null>(null);
 
   useEffect(() => {
@@ -18,8 +26,8 @@ export function General() {
 
   return (
     <>
-      <Section title="启动">
-        <Row label="开机自启" hint="登录 Windows 后自动在后台运行">
+      <Section title={t.general.startupTitle}>
+        <Row label={t.general.autostart} hint={t.general.autostartHint}>
           <Toggle
             checked={meta?.autostart_enabled ?? false}
             onChange={async (value) => {
@@ -28,29 +36,40 @@ export function General() {
             }}
           />
         </Row>
+        <Row label={t.general.language} hint={t.general.languageHint}>
+          <select
+            className="select"
+            value={config.general.language}
+            onChange={(event) =>
+              update((d) => void (d.general.language = event.target.value))
+            }
+          >
+            <option value="auto">{t.general.langAuto}</option>
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
+        </Row>
       </Section>
 
-      <Section title="文件位置">
-        <Row label="配置文件" hint={meta?.config_path}>
+      <Section title={t.general.filesTitle}>
+        <Row label={t.general.configFile} hint={meta?.config_path}>
           <button className="btn" onClick={() => openConfigDir()}>
-            打开所在目录
+            {t.general.openDir}
           </button>
         </Row>
-        <Row label="日志" hint={meta?.log_dir}>
+        <Row label={t.general.logFile} hint={meta?.log_dir}>
           <button className="btn" onClick={() => openLogsDir()}>
-            打开所在目录
+            {t.general.openDir}
           </button>
         </Row>
       </Section>
 
-      <Section title="关于">
-        <Row label="版本">
-          <span className="hint-text">SmsPop v{meta?.version ?? "…"} · MIT License</span>
+      <Section title={t.general.aboutTitle}>
+        <Row label={t.general.version}>
+          <span className="hint-text">{t.general.versionText(meta?.version ?? "…")}</span>
         </Row>
-        <Row label="安全承诺">
-          <span className="hint-text">
-            验证码只在你点击候选条时填入；应用不联网、不上传任何通知内容。
-          </span>
+        <Row label={t.general.promise}>
+          <span className="hint-text">{t.general.promiseText}</span>
         </Row>
       </Section>
     </>

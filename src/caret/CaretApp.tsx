@@ -4,9 +4,11 @@ import {
   caretInsert,
   caretLayout,
   getCaretOffer,
+  getConfig,
   onCaretOffer,
   type CaretOfferTuple,
 } from "../shared/api";
+import { dict, resolveLang, type Lang } from "../shared/i18n";
 
 type Phase = "ready" | "inserting" | "done" | "failed";
 
@@ -20,14 +22,19 @@ type Phase = "ready" | "inserting" | "done" | "failed";
 export function CaretApp() {
   const [offer, setOffer] = useState<CaretOfferTuple | null>(null);
   const [phase, setPhase] = useState<Phase>("ready");
-  const [message, setMessage] = useState("");
+  const [lang, setLang] = useState<Lang>("zh");
   const pillRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    getConfig()
+      .then((config) => setLang(resolveLang(config.general.language)))
+      .catch(() => {});
+  }, []);
 
   const refresh = useCallback(async () => {
     const next = await getCaretOffer().catch(() => null);
     setOffer(next);
     setPhase("ready");
-    setMessage("");
   }, []);
 
   useEffect(() => {
@@ -48,6 +55,7 @@ export function CaretApp() {
 
   if (!offer) return null;
 
+  const t = dict(lang);
   const [generation, code] = offer;
 
   const onInsert = async () => {
@@ -57,11 +65,10 @@ export function CaretApp() {
 
     if (result?.[0]) {
       setPhase("done");
-      setMessage("已填入");
       setTimeout(() => caretHide(), 900);
     } else {
+      // 失败详情 Rust 侧已记日志；界面给统一的人话
       setPhase("failed");
-      setMessage(result?.[1] ?? "写入失败，请手动粘贴（已复制到剪贴板）");
       setTimeout(() => caretHide(), 1800);
     }
   };
@@ -75,13 +82,13 @@ export function CaretApp() {
     >
       {phase === "ready" && (
         <>
-          <span className="pill-action">填入</span>
+          <span className="pill-action">{t.caret.fill}</span>
           <span className="pill-code">{code}</span>
         </>
       )}
-      {phase === "inserting" && <span>填入中…</span>}
-      {phase === "done" && <span>✓ {message}</span>}
-      {phase === "failed" && <span>✗ {message}</span>}
+      {phase === "inserting" && <span>{t.caret.filling}</span>}
+      {phase === "done" && <span>{t.caret.done}</span>}
+      {phase === "failed" && <span>{t.caret.failed}</span>}
     </button>
   );
 }
