@@ -101,6 +101,8 @@ export const toastClick = () =>
   invoke<string | null>("toast_click", { label: getCurrentWindow().label });
 export const toastClose = () =>
   invoke<void>("toast_close", { label: getCurrentWindow().label });
+export const toastResize = (height: number) =>
+  invoke<void>("toast_resize", { label: getCurrentWindow().label, height });
 
 // ── 候选条窗口 ────────────────────────────────────────────────
 

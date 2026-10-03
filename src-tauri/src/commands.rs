@@ -200,6 +200,12 @@ pub fn toast_close(app: AppHandle, label: String) {
     popups::close_toast(&app, &label);
 }
 
+/// toast 前端量出了真实高度 → 调整窗口并显示。
+#[tauri::command]
+pub fn toast_resize(app: AppHandle, label: String, height: f64) {
+    popups::resize_and_show(&app, &label, height);
+}
+
 // ── 候选条窗口 ────────────────────────────────────────────────
 
 /// caret 前端加载完成后主动来取当前提议。

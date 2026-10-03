@@ -3,6 +3,7 @@ import {
   getToastPayload,
   toastClick,
   toastClose,
+  toastResize,
   type ToastPayload,
 } from "../shared/api";
 
@@ -26,6 +27,16 @@ export function ToastApp() {
       setPayload(payload);
     });
   }, []);
+
+  // 渲染完后量出真实高度报给 Rust：它调窗口尺寸 + 重排 + 显示。
+  // （内容两行三行都可能，固定高度会裁掉「点击复制」那一行。）
+  useEffect(() => {
+    if (!payload) return;
+    const card = document.querySelector(".toast");
+    if (!card) return;
+    const height = Math.ceil(card.getBoundingClientRect().height) + 8; // body 上下各 4px 阴影留白
+    toastResize(height);
+  }, [payload]);
 
   if (!payload) {
     return null;

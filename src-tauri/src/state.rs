@@ -42,6 +42,9 @@ pub struct AppState {
     /// 还没来得及被前端取走的 toast 负载（label → payload）。
     pub pending_toasts: Mutex<HashMap<String, ToastPayload>>,
 
+    /// 每个 toast 的实际高度（DIP）—— 内容多长窗口多高，前端量完报上来。
+    pub toast_heights: Mutex<HashMap<String, f64>>,
+
     /// toast 窗口编号。
     pub toast_seq: AtomicU64,
 
@@ -88,6 +91,7 @@ impl AppState {
             subscribed_at: Mutex::new(None),
             toasts: Mutex::new(VecDeque::new()),
             pending_toasts: Mutex::new(HashMap::new()),
+            toast_heights: Mutex::new(HashMap::new()),
             toast_seq: AtomicU64::new(0),
             autostart_item: Mutex::new(None),
             caret_offer: Mutex::new(None),
