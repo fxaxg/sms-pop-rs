@@ -1,6 +1,7 @@
 //! 蓝牙链路线程：把 `LinkEvent` 翻译成应用动作（弹窗 / 复制 / 候选条 / 状态广播）。
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use log::{info, warn};
 use smspop_ble::{AncsLink, LinkEvent, LinkState};
@@ -51,6 +52,10 @@ fn on_link_state(app: &AppHandle, state: LinkState, detail: Option<String>) {
             .write()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         *guard = (state, detail.clone());
+
+        if state == LinkState::Subscribed {
+            *app_state.subscribed_at.lock().unwrap() = Some(std::time::Instant::now());
+        }
     }
 
     tray::on_link_state(app, state);
@@ -71,7 +76,22 @@ fn on_link_state(app: &AppHandle, state: LinkState, detail: Option<String>) {
 pub fn dispatch_notification(app: &AppHandle, notification: PhoneNotification) {
     let state = app.state::<AppState>();
 
-    if state.dedup.is_duplicate(&notification) {
+    // 订阅成功后的宽限期里按内容去重 —— iOS 会把通知中心存量用新 uid 重推一遍。
+    let in_grace = state
+        .subscribed_at
+        .lock()
+        .unwrap()
+        .is_some_and(|t| t.elapsed() < Duration::from_secs(5));
+
+    let duplicate = if in_grace {
+        state
+            .dedup
+            .is_duplicate_key_at(&notification.content_key(), std::time::Instant::now())
+    } else {
+        state.dedup.is_duplicate(&notification)
+    };
+
+    if duplicate {
         info!("重复通知，忽略：{}", notification.summary());
         return;
     }

@@ -30,6 +30,12 @@ pub struct AppState {
     /// 蓝牙链路的停止开关。
     pub link_stop: Arc<AtomicBool>,
 
+    /// 最近一次「订阅成功」的时间。
+    ///
+    /// iOS 会在订阅成功后重推通知中心存量 —— 之后几秒内到达的通知
+    /// 要按**内容**去重（uid 是新的），否则重启/重连会重弹一堆旧通知。
+    pub subscribed_at: Mutex<Option<std::time::Instant>>,
+
     /// 当前打开的 toast 窗口标签（旧的在前）。
     pub toasts: Mutex<VecDeque<String>>,
 
@@ -79,6 +85,7 @@ impl AppState {
             dedup: NotificationDeduplicator::default(),
             uia: RwLock::new(uia),
             link_stop: Arc::new(AtomicBool::new(false)),
+            subscribed_at: Mutex::new(None),
             toasts: Mutex::new(VecDeque::new()),
             pending_toasts: Mutex::new(HashMap::new()),
             toast_seq: AtomicU64::new(0),
