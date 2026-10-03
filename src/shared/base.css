@@ -1,0 +1,64 @@
+/* SmsPop 设计令牌 —— 所有窗口共用 */
+
+:root {
+  --accent: #4f6ef7;
+  --accent-strong: #3b5bec;
+  --accent-soft: rgba(79, 110, 247, 0.12);
+
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-hover: #f0f1f5;
+  --border: #e4e6ec;
+
+  --text: #1d2129;
+  --text-secondary: #6b7280;
+  --text-faint: #9ca3af;
+
+  --success: #22b07d;
+  --warning: #e8a13a;
+  --danger: #e5534b;
+
+  --radius: 10px;
+  --radius-lg: 14px;
+
+  --shadow: 0 8px 28px rgba(20, 24, 40, 0.14);
+
+  font-family: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16171b;
+    --surface: #1f2126;
+    --surface-hover: #26292f;
+    --border: #33363e;
+
+    --text: #e8eaf0;
+    --text-secondary: #9aa0ab;
+    --text-faint: #6b7280;
+
+    --accent-soft: rgba(79, 110, 247, 0.22);
+    --shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}

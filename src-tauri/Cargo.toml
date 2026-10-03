@@ -1,0 +1,38 @@
+[package]
+name = "smspop-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "把 iPhone 的通知和验证码接到 Windows 上"
+
+[lib]
+name = "smspop_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-log = "2"
+
+smspop-core = { path = "../crates/smspop-core" }
+smspop-ble = { path = "../crates/smspop-ble" }
+smspop-uia = { path = "../crates/smspop-uia" }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+tokio = { version = "1", features = ["time"] }
+
+[dependencies.windows]
+workspace = true
+features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_HiDpi",
+]

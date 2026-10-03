@@ -1,0 +1,40 @@
+[package]
+name = "smspop-uia"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SmsPop 的焦点探测与写入：UIA 探输入框 + 点击后填入"
+
+# ★ 这个 crate 里有整个项目**唯一**会改动别人内容的地方（`insert`）。
+#   它只被候选条的鼠标点击调用，没有任何自动路径。
+#
+# ★ 线程模型：UIA 的 COM 接口**绝不跨线程**。
+#   这里有一个专属工作线程，它：
+#     - 初始化 COM（MTA）
+#     - 持有 IUIAutomation 和探测到的元素
+#     - 只把**纯数据**（矩形、DPI、长度）传回给调用方
+#   这样既天然满足"900ms 超时绝不拖住 UI"，
+#   也完全不用碰 COM 的跨线程接口封送（CoMarshalInterThreadInterfaceInStream 那一套）。
+
+[dependencies]
+smspop-core = { path = "../smspop-core" }
+
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    # UIA
+    "Win32_UI_Accessibility",
+    # CoInitializeEx / CoCreateInstance / SAFEARRAY
+    "Win32_System_Com",
+    # SafeArrayGetLBound/UBound/GetElement（虽然名字像 Com，实际在 Ole 下）
+    "Win32_System_Ole",
+    # ClientToScreen / MonitorFromPoint / GetMonitorInfoW
+    "Win32_Graphics_Gdi",
+    # GetDpiForWindow
+    "Win32_UI_HiDpi",
+    # GetForegroundWindow / GetGUIThreadInfo / GetClassNameW / 工作区兜底
+    "Win32_UI_WindowsAndMessaging",
+    # SendInput（simulate 模式逐字键入）
+    "Win32_UI_Input_KeyboardAndMouse",
+] }
+
+log = { workspace = true }
