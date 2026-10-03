@@ -1,14 +1,12 @@
 /* toast 弹窗（窗口本身是透明的，卡片浮在上面） */
 
 html,
-body,
-#root {
-  height: 100%;
-}
-
 body {
   background: transparent;
   overflow: hidden;
+}
+
+body {
   padding: 4px; /* 给阴影留位置 */
 }
 
@@ -17,7 +15,7 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  height: 100%;
+  /* 高度由内容决定：前端量它的高度报给 Rust 调窗口 */
   padding: 12px 14px 14px;
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--surface) 96%, transparent);
@@ -61,7 +59,7 @@ body {
   font-size: 13px;
   line-height: 1.45;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
