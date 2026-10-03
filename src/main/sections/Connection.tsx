@@ -11,6 +11,8 @@ import { Section, Row } from "../components";
 /** 「连接」页：链路状态 + 新手引导。 */
 export function Connection() {
   const [link, setLink] = useState<LinkStatePayload | null>(null);
+  // 测试通知倒计时：点了之后 Rust 会延迟 4 秒发出，按钮同步倒数
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     getLinkState().then(setLink).catch(() => {});
@@ -19,6 +21,26 @@ export function Connection() {
       unlisten.then((fn) => fn());
     };
   }, []);
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown < 0) {
+      setCountdown(null);
+      return;
+    }
+    // 4→1 每秒倒数；到 0 显示「已发送」停留 1.5 秒再复位
+    const timer = setTimeout(
+      () => setCountdown((s) => (s ?? 0) - 1),
+      countdown === 0 ? 1500 : 1000,
+    );
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  const onSendTest = () => {
+    if (countdown !== null) return;
+    sendTestNotification().catch(() => {});
+    setCountdown(4);
+  };
 
   const unsupported = link?.state === "adapter_unsupported";
   const ready = link?.ready ?? false;
@@ -69,8 +91,16 @@ export function Connection() {
               （4 秒后发出 —— 趁这几秒把光标点进一个输入框，还能顺便看到「填入」候选条）。
             </p>
             <div className="row-control">
-              <button className="btn primary" onClick={() => sendTestNotification()}>
-                发送测试通知
+              <button
+                className="btn primary"
+                onClick={onSendTest}
+                disabled={countdown !== null}
+              >
+                {countdown === null
+                  ? "发送测试通知"
+                  : countdown > 0
+                    ? `${countdown} 秒后发出…`
+                    : "已发送 ✓"}
               </button>
             </div>
           </li>
