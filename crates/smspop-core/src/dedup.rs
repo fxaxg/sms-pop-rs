@@ -41,8 +41,15 @@ impl NotificationDeduplicator {
 
     /// 指定"当前时间"的版本 —— 只有测试会用，这样不用真的等 10 分钟。
     pub fn is_duplicate_at(&self, notification: &PhoneNotification, now: Instant) -> bool {
-        let key = build_key(notification);
+        self.is_duplicate_key_at(&build_key(notification), now)
+    }
 
+    /// 按任意键去重（比如「设备 + 内容」）。
+    ///
+    /// 用途：iOS 会在**每次订阅成功后**把通知中心的存量重推一遍，uid 是新的，
+    /// 按 uid 去重拦不住 —— 重启 / 重连后旧通知会再弹一轮。
+    /// 调用方在订阅成功后的宽限期里用内容键把存量拦掉。
+    pub fn is_duplicate_key_at(&self, key: &str, now: Instant) -> bool {
         // 锁中毒（有线程在持锁时 panic）不该让整条链路停摆，直接取回数据
         let mut seen = self
             .seen
@@ -51,11 +58,11 @@ impl NotificationDeduplicator {
 
         seen.retain(|_, first_seen| now.duration_since(*first_seen) < self.retention);
 
-        if seen.contains_key(&key) {
+        if seen.contains_key(key) {
             return true;
         }
 
-        seen.insert(key, now);
+        seen.insert(key.to_string(), now);
         false
     }
 
@@ -124,6 +131,36 @@ mod tests {
 
         assert!(!dedup.is_duplicate(&notification("dev-a", 7)));
         assert!(!dedup.is_duplicate(&notification("dev-b", 7)));
+    }
+
+    #[test]
+    fn 内容键去重能拦住_换uid_的存量重推() {
+        let dedup = NotificationDeduplicator::default();
+
+        let mut first = notification("dev", 1);
+        first.title = Some("10086".to_string());
+        first.message = Some("验证码：123456".to_string());
+
+        // 同一条通知，重连后 uid 变了
+        let mut redelivered = notification("dev", 99);
+        redelivered.title = first.title.clone();
+        redelivered.message = first.message.clone();
+
+        assert!(!dedup.is_duplicate_key_at(&first.content_key(), Instant::now()));
+        assert!(dedup.is_duplicate_key_at(&redelivered.content_key(), Instant::now()));
+    }
+
+    #[test]
+    fn 内容键不同不算重复() {
+        let dedup = NotificationDeduplicator::default();
+
+        let mut a = notification("dev", 1);
+        a.message = Some("验证码：111111".to_string());
+        let mut b = notification("dev", 2);
+        b.message = Some("验证码：222222".to_string());
+
+        assert!(!dedup.is_duplicate_key_at(&a.content_key(), Instant::now()));
+        assert!(!dedup.is_duplicate_key_at(&b.content_key(), Instant::now()));
     }
 
     #[test]
