@@ -19,6 +19,25 @@ pub struct Config {
 
     /// 验证码增强：识别验证码、复制、光标候选条。
     pub otp: OtpOptions,
+
+    /// 通用。
+    pub general: GeneralOptions,
+}
+
+/// 通用设置。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct GeneralOptions {
+    /// 界面语言：`auto`（跟随系统）/ `zh-CN` / `en`。
+    pub language: String,
+}
+
+impl Default for GeneralOptions {
+    fn default() -> Self {
+        Self {
+            language: "auto".to_string(),
+        }
+    }
 }
 
 impl Config {
@@ -335,6 +354,12 @@ pub const DEFAULT_CONFIG_JSON: &str = r#"{
       // simulate 模式下每个字符之间的间隔（毫秒，会被夹到 0~1000）
       "type_delay_ms": 60
     }
+  },
+
+  // ── 通用 ────────────────────────────────────────────────────
+  "general": {
+    // 界面语言：auto（跟随系统）/ zh-CN / en
+    "language": "auto"
   }
 }
 "#;
