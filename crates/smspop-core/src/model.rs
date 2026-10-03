@@ -60,6 +60,20 @@ impl PhoneNotification {
         self.code.as_ref().is_some_and(|code| !code.is_empty())
     }
 
+    /// 内容指纹（设备 + App + 标题 + 正文）。
+    ///
+    /// 用途：iOS 在每次 ANCS 订阅成功后会把通知中心的存量重推一遍，
+    /// uid 每次都是新的，按 uid 去重拦不住 —— 订阅后的宽限期里改按这个键去重。
+    pub fn content_key(&self) -> String {
+        format!(
+            "{}|{}|{}|{}",
+            self.device_id,
+            self.app_identifier.as_deref().unwrap_or(""),
+            self.title.as_deref().unwrap_or(""),
+            self.message.as_deref().unwrap_or("")
+        )
+    }
+
     /// 标题/副标题/正文拼起来（跳过空白），用于展示与关键词匹配。
     pub fn full_text(&self) -> String {
         [&self.title, &self.subtitle, &self.message]
