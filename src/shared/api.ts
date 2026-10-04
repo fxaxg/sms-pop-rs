@@ -82,6 +82,7 @@ export interface LinkStatePayload {
   label: string;
   detail: string | null;
   ready: boolean;
+  awaiting_verification: boolean;
 }
 
 export const getLinkState = () => invoke<LinkStatePayload>("get_link_state");

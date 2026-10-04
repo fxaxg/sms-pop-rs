@@ -34,8 +34,10 @@ pub struct LinkStatePayload {
     pub label: String,
     /// 补充说明（错误原因等），可能为空。
     pub detail: Option<String>,
-    /// 是否已就绪（可以正常收通知）。
+    /// 是否已就绪（订阅成功，并且真正收到过 iPhone 的 ANCS 数据）。
     pub ready: bool,
+    /// ANCS 已订阅，但尚未用一条真实 iPhone 通知验证。
+    pub awaiting_verification: bool,
 }
 
 /// 一条 toast 弹窗的展示负载。

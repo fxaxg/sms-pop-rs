@@ -36,6 +36,12 @@ pub struct AppState {
     /// 要按**内容**去重（uid 是新的），否则重启/重连会重弹一堆旧通知。
     pub subscribed_at: Mutex<Option<std::time::Instant>>,
 
+    /// 本轮 ANCS 会话是否真正收到过 iPhone 数据。
+    ///
+    /// 订阅 API 返回成功不代表 iPhone 已允许「共享系统通知」；只有收到真实
+    /// Notification Source 事件后，UI 才能把链路称为「已就绪」。
+    pub link_verified: AtomicBool,
+
     /// 当前打开的 toast 窗口标签（旧的在前）。
     pub toasts: Mutex<VecDeque<String>>,
 
@@ -89,6 +95,7 @@ impl AppState {
             uia: RwLock::new(uia),
             link_stop: Arc::new(AtomicBool::new(false)),
             subscribed_at: Mutex::new(None),
+            link_verified: AtomicBool::new(false),
             toasts: Mutex::new(VecDeque::new()),
             pending_toasts: Mutex::new(HashMap::new()),
             toast_heights: Mutex::new(HashMap::new()),

@@ -100,7 +100,7 @@ pub fn open_main_window(app: &AppHandle) {
 }
 
 /// 链路状态变了 → 更新 tooltip。
-pub fn on_link_state(app: &AppHandle, state: LinkState) {
+pub fn on_link_state(app: &AppHandle, state: LinkState, verified: bool) {
     let en = app.state::<AppState>().config().general.language == "en";
     let label = if en {
         match state {
@@ -109,12 +109,17 @@ pub fn on_link_state(app: &AppHandle, state: LinkState) {
             LinkState::Advertising => "Waiting for iPhone",
             LinkState::WaitingForConnection => "Waiting for link",
             LinkState::Connected => "Connected",
-            LinkState::Subscribed => "Ready",
+            LinkState::Subscribed if verified => "Ready",
+            LinkState::Subscribed => "Waiting for notification test",
             LinkState::Reconnecting => "Reconnecting",
             LinkState::Faulted => "Error",
         }
     } else {
-        state.describe()
+        match state {
+            LinkState::Subscribed if verified => "已就绪",
+            LinkState::Subscribed => "等待通知验证",
+            _ => state.describe(),
+        }
     };
 
     if let Some(tray) = app.tray_by_id("main") {
