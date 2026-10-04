@@ -108,18 +108,23 @@ fn open_in_explorer(path: &std::path::Path) -> Result<(), String> {
 // ── 链路 ──────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn get_link_state(state: State<'_, AppState>) -> LinkStatePayload {
-    let guard = state
+pub fn get_link_state(app_state: State<'_, AppState>) -> LinkStatePayload {
+    let guard = app_state
         .link_state
         .read()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let (state, detail) = guard.clone();
+    let (link_state, detail) = guard.clone();
+    let verified = link_state.is_ready()
+        && app_state
+            .link_verified
+            .load(std::sync::atomic::Ordering::Relaxed);
 
     LinkStatePayload {
-        state: crate::types::state_key(state).to_string(),
-        label: state.describe().to_string(),
+        state: crate::types::state_key(link_state).to_string(),
+        label: link_state.describe().to_string(),
         detail,
-        ready: state.is_ready(),
+        ready: verified,
+        awaiting_verification: link_state.is_ready() && !verified,
     }
 }
 

@@ -1,5 +1,6 @@
 //! 蓝牙链路线程：把 `LinkEvent` 翻译成应用动作（弹窗 / 复制 / 候选条 / 状态广播）。
 
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -34,7 +35,10 @@ pub fn spawn(app: AppHandle) {
 fn handle_event(app: &AppHandle, event: LinkEvent) {
     match event {
         LinkEvent::StateChanged { state, detail } => on_link_state(app, state, detail),
-        LinkEvent::Notification(notification) => dispatch_notification(app, *notification),
+        LinkEvent::Notification(notification) => {
+            verify_link(app);
+            dispatch_notification(app, *notification);
+        }
     }
 }
 
@@ -53,22 +57,60 @@ fn on_link_state(app: &AppHandle, state: LinkState, detail: Option<String>) {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         *guard = (state, detail.clone());
 
+        // 每次离开已订阅状态都结束本轮验证；下次订阅必须重新收到真实数据。
+        if state != LinkState::Subscribed {
+            app_state.link_verified.store(false, Ordering::Relaxed);
+        }
+
         if state == LinkState::Subscribed {
             *app_state.subscribed_at.lock().unwrap() = Some(std::time::Instant::now());
         }
     }
 
-    tray::on_link_state(app, state);
+    let verified = state == LinkState::Subscribed
+        && app
+            .state::<AppState>()
+            .link_verified
+            .load(Ordering::Relaxed);
+    tray::on_link_state(app, state, verified);
 
     let payload = LinkStatePayload {
         state: crate::types::state_key(state).to_string(),
         label: state.describe().to_string(),
         detail,
-        ready: state.is_ready(),
+        ready: verified,
+        awaiting_verification: state == LinkState::Subscribed && !verified,
     };
 
     if let Err(error) = app.emit(crate::types::EVENT_LINK_STATE, payload) {
         warn!("广播链路状态失败：{error}");
+    }
+}
+
+/// 第一条真实 ANCS 数据到达后，把「已订阅」提升为「已验证」。
+/// 本地测试通知不经过这里，因此不会伪造链路成功。
+fn verify_link(app: &AppHandle) {
+    let app_state = app.state::<AppState>();
+    let (state, detail) = app_state
+        .link_state
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone();
+    if state != LinkState::Subscribed || app_state.link_verified.swap(true, Ordering::Relaxed) {
+        return;
+    }
+
+    info!("已收到真实 iPhone 通知，ANCS 链路验证通过");
+    tray::on_link_state(app, state, true);
+    let payload = LinkStatePayload {
+        state: crate::types::state_key(state).to_string(),
+        label: state.describe().to_string(),
+        detail,
+        ready: true,
+        awaiting_verification: false,
+    };
+    if let Err(error) = app.emit(crate::types::EVENT_LINK_STATE, payload) {
+        warn!("广播链路验证状态失败：{error}");
     }
 }
 
