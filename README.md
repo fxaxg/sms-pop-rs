@@ -31,6 +31,20 @@ npm install
 npm run tauri dev
 ```
 
+反复测试首次配对时，推荐使用干净测试脚本。它会先清理 Rust/C# ANCS
+测试进程和本仓库遗留的 Vite 进程，等待蓝牙资源释放，再启动开发版；按
+`Ctrl+C` 后还会清理一次：
+
+```powershell
+pwsh -NoProfile -File .\tools\test-ancs.ps1
+
+# 只清理，不启动
+pwsh -NoProfile -File .\tools\test-ancs.ps1 -CleanOnly
+```
+
+关闭设置窗口只会隐藏到托盘，并不等于退出应用。普通使用时请从托盘菜单选择
+“退出”；开发测试则优先使用上面的脚本。
+
 ## License
 
 MIT
