@@ -103,6 +103,7 @@ export interface ManagedDevice {
   verified: boolean;
   last_connected_at: number | null;
   last_verified_at: number | null;
+  battery_level: number | null;
 }
 
 export const listDevices = () => invoke<ManagedDevice[]>("list_devices");

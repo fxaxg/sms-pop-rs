@@ -80,6 +80,8 @@ pub enum LinkEvent {
     DevicesDiscovered(Vec<DeviceInfo>),
     /// 当前实际选择的设备；断开时为 None。
     ActiveDevice(Option<DeviceInfo>),
+    /// 可选的标准 BLE 电量百分比。读取不到时不会发送事件。
+    BatteryLevel { device_id: String, level: u8 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -354,6 +356,17 @@ impl AncsLink {
             connected: true,
         })));
         self.emit(LinkState::Subscribed, None);
+
+        // ANCS 已稳定后再做一次可选读取，失败完全不影响通知链路。
+        if let Some(level) = discovery::try_read_battery_level(&device) {
+            info!("读取到设备电量：{level}%");
+            (self.sink)(LinkEvent::BatteryLevel {
+                device_id: device_id.clone(),
+                level,
+            });
+        } else {
+            info!("设备未提供可读取的标准 BLE 电量");
+        }
 
         // 守着这条链路，直到断开或者被要求退出。
         //

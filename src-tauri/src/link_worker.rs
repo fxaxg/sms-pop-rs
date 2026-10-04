@@ -67,6 +67,14 @@ fn handle_event(app: &AppHandle, event: LinkEvent) {
                 .set_active(device.as_ref());
             emit_devices(app);
         }
+        LinkEvent::BatteryLevel { device_id, level } => {
+            app.state::<AppState>()
+                .devices
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .set_battery_level(&device_id, level);
+            emit_devices(app);
+        }
     }
 }
 

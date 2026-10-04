@@ -27,6 +27,7 @@ pub struct ManagedDevicePayload {
     pub verified: bool,
     pub last_connected_at: Option<u64>,
     pub last_verified_at: Option<u64>,
+    pub battery_level: Option<u8>,
 }
 
 pub struct DeviceRegistry {
@@ -34,6 +35,7 @@ pub struct DeviceRegistry {
     devices: Vec<KnownDevice>,
     active_id: Option<String>,
     active_connected: bool,
+    battery_level: Option<u8>,
     online_ids: Vec<String>,
 }
 
@@ -56,6 +58,7 @@ impl DeviceRegistry {
             devices,
             active_id: None,
             active_connected: false,
+            battery_level: None,
             online_ids: Vec::new(),
         }
     }
@@ -87,8 +90,12 @@ impl DeviceRegistry {
     }
 
     pub fn set_active(&mut self, device: Option<&DeviceInfo>) {
+        let previous_id = self.active_id.clone();
         self.active_id = device.map(|device| device.id.clone());
         self.active_connected = device.is_some_and(|device| device.connected);
+        if previous_id.as_deref() != self.active_id.as_deref() || device.is_none() {
+            self.battery_level = None;
+        }
         if let Some(device) = device {
             let now = now_ms();
             if let Some(known) = self.find_mut(&device.id) {
@@ -98,6 +105,16 @@ impl DeviceRegistry {
                 }
             }
             self.save();
+        }
+    }
+
+    pub fn set_battery_level(&mut self, id: &str, level: u8) {
+        if self
+            .active_id
+            .as_deref()
+            .is_some_and(|active| active.eq_ignore_ascii_case(id))
+        {
+            self.battery_level = Some(level.min(100));
         }
     }
 
@@ -183,6 +200,11 @@ impl DeviceRegistry {
                 verified: device.last_verified_unix_ms.is_some(),
                 last_connected_at: device.last_connected_unix_ms,
                 last_verified_at: device.last_verified_unix_ms,
+                battery_level: self
+                    .active_id
+                    .as_deref()
+                    .filter(|id| id.eq_ignore_ascii_case(&device.id))
+                    .and(self.battery_level),
             })
             .collect();
         payloads.sort_by_key(|device| (!device.current, !device.preferred, device.name.clone()));
