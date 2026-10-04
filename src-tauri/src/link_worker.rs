@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use log::{info, warn};
-use smspop_ble::{AncsLink, LinkEvent, LinkState};
+use smspop_ble::{AncsLink, DeviceInfo, LinkEvent, LinkState};
 use smspop_core::model::PhoneNotification;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -22,9 +22,20 @@ pub fn spawn(app: AppHandle) {
         .name("ancs-link".to_string())
         .spawn(move || {
             let sink_app = app.clone();
+            let selector_app = app.clone();
             let sink = Arc::new(move |event: LinkEvent| handle_event(&sink_app, event));
 
-            AncsLink::new(sink, stop).run();
+            let selector = Arc::new(move |devices: &[DeviceInfo]| {
+                selector_app
+                    .state::<AppState>()
+                    .devices
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .discover(devices)
+            });
+            AncsLink::new(sink, stop)
+                .with_device_selector(selector)
+                .run();
         });
 
     if let Err(error) = result {
@@ -38,6 +49,23 @@ fn handle_event(app: &AppHandle, event: LinkEvent) {
         LinkEvent::Notification(notification) => {
             verify_link(app);
             dispatch_notification(app, *notification);
+        }
+        LinkEvent::DevicesDiscovered(devices) => {
+            // 非空列表通常已经由 selector 更新过；空列表用于清掉上一轮在线快照。
+            app.state::<AppState>()
+                .devices
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .discover(&devices);
+            emit_devices(app);
+        }
+        LinkEvent::ActiveDevice(device) => {
+            app.state::<AppState>()
+                .devices
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .set_active(device.as_ref());
+            emit_devices(app);
         }
     }
 }
@@ -101,6 +129,16 @@ fn verify_link(app: &AppHandle) {
     }
 
     info!("已收到真实 iPhone 通知，ANCS 链路验证通过");
+    {
+        let mut devices = app_state
+            .devices
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(id) = devices.active_id() {
+            devices.mark_verified(&id);
+        }
+    }
+    emit_devices(app);
     tray::on_link_state(app, state, true);
     let payload = LinkStatePayload {
         state: crate::types::state_key(state).to_string(),
@@ -111,6 +149,18 @@ fn verify_link(app: &AppHandle) {
     };
     if let Err(error) = app.emit(crate::types::EVENT_LINK_STATE, payload) {
         warn!("广播链路验证状态失败：{error}");
+    }
+}
+
+pub fn emit_devices(app: &AppHandle) {
+    let devices = app
+        .state::<AppState>()
+        .devices
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .payloads();
+    if let Err(error) = app.emit(crate::types::EVENT_DEVICES_CHANGED, devices) {
+        warn!("广播设备列表失败：{error}");
     }
 }
 

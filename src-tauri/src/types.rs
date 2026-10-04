@@ -5,6 +5,7 @@ use smspop_core::placement::RectD;
 
 /// 链路状态变化事件（Rust → 所有前端窗口）。
 pub const EVENT_LINK_STATE: &str = "link-state";
+pub const EVENT_DEVICES_CHANGED: &str = "devices-changed";
 
 /// 候选条有新验证码（Rust → caret 窗口）。
 pub const EVENT_CARET_OFFER: &str = "caret-offer";
