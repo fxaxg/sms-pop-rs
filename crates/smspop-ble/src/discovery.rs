@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 
 use log::{info, warn};
 use smspop_core::ancs::ANCS_SERVICE_UUID;
+use smspop_core::uuid::Uuid;
 use windows::Devices::Bluetooth::GenericAttributeProfile::{
     GattCommunicationStatus, GattDeviceService,
 };
@@ -17,6 +18,7 @@ use windows::Devices::Bluetooth::{
 };
 use windows::Devices::Enumeration::DeviceInformation;
 
+use crate::util::buffer_to_vec;
 use crate::util::{block_on, guid};
 use crate::{BleError, Result};
 
@@ -30,6 +32,13 @@ const SERVICE_RETRY_DELAY: Duration = Duration::from_secs(2);
 /// ★ 这是 Rust 版新发现的：C# 版没有这个等待，
 ///   它只在"杀掉残留进程"之后碰巧能过，其实真因是时序。
 pub const SETTLE_BEFORE_SERVICE: Duration = Duration::from_millis(1500);
+
+const BATTERY_SERVICE_UUID: Uuid = Uuid::from_bytes([
+    0x00, 0x00, 0x18, 0x0F, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB,
+]);
+const BATTERY_LEVEL_UUID: Uuid = Uuid::from_bytes([
+    0x00, 0x00, 0x2A, 0x19, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB,
+]);
 
 /// 找到的 ANCS 设备候选。
 pub struct DiscoveredDevice {
@@ -166,6 +175,60 @@ pub fn get_ancs_service(device: &BluetoothLEDevice) -> Result<GattDeviceService>
          提示：0x80070020 表示有别的程序正占用这台蓝牙设备\
          （例如另开了一个 SmsPop，或者蓝牙调试工具没关）"
     )))
+}
+
+/// 尝试读取标准 BLE Battery Service。任何不支持或读取失败都返回 None，
+/// 绝不影响 ANCS 主链路。
+pub fn try_read_battery_level(device: &BluetoothLEDevice) -> Option<u8> {
+    let services_result = block_on(async {
+        device
+            .GetGattServicesForUuidWithCacheModeAsync(
+                guid(BATTERY_SERVICE_UUID),
+                BluetoothCacheMode::Uncached,
+            )
+            .ok()?
+            .await
+            .ok()
+    })?;
+    if services_result.Status().ok()? != GattCommunicationStatus::Success {
+        return None;
+    }
+    let services = services_result.Services().ok()?;
+    if services.Size().ok()? == 0 {
+        return None;
+    }
+    let service = services.GetAt(0).ok()?;
+
+    let characteristics_result = block_on(async {
+        service
+            .GetCharacteristicsForUuidWithCacheModeAsync(
+                guid(BATTERY_LEVEL_UUID),
+                BluetoothCacheMode::Uncached,
+            )
+            .ok()?
+            .await
+            .ok()
+    })?;
+    if characteristics_result.Status().ok()? != GattCommunicationStatus::Success {
+        return None;
+    }
+    let characteristics = characteristics_result.Characteristics().ok()?;
+    if characteristics.Size().ok()? == 0 {
+        return None;
+    }
+    let characteristic = characteristics.GetAt(0).ok()?;
+    let read_result = block_on(async {
+        characteristic
+            .ReadValueWithCacheModeAsync(BluetoothCacheMode::Uncached)
+            .ok()?
+            .await
+            .ok()
+    })?;
+    if read_result.Status().ok()? != GattCommunicationStatus::Success {
+        return None;
+    }
+    let bytes = buffer_to_vec(&read_result.Value().ok()?).ok()?;
+    bytes.first().copied().filter(|level| *level <= 100)
 }
 
 pub fn is_connected(device: &BluetoothLEDevice) -> bool {

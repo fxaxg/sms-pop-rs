@@ -122,6 +122,7 @@ export function Connection() {
                     : device.online
                       ? t.connection.deviceOnline
                       : t.connection.deviceOffline}
+                  {device.battery_level !== null && ` · ${t.connection.battery(device.battery_level)}`}
                 </p>
                 <div className="device-actions">
                   {!device.preferred && (
