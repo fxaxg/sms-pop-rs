@@ -23,6 +23,10 @@ pub fn config_path(app: &AppHandle) -> PathBuf {
     data_dir(app).join("config.json")
 }
 
+pub fn devices_path(app: &AppHandle) -> PathBuf {
+    data_dir(app).join("devices.json")
+}
+
 pub fn log_dir(app: &AppHandle) -> PathBuf {
     let dir = app
         .path()

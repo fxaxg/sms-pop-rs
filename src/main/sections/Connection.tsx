@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
 import {
   getLinkState,
+  listDevices,
+  onDevicesChanged,
   onLinkState,
   openBluetoothSettings,
+  setDeviceEnabled,
+  setPreferredDevice,
+  forgetDevice,
   sendTestNotification,
   type LinkStatePayload,
+  type ManagedDevice,
 } from "../../shared/api";
 import { useT } from "../../shared/i18n";
 import { Section, Row } from "../components";
@@ -14,12 +20,17 @@ export function Connection() {
   const t = useT();
   const [link, setLink] = useState<LinkStatePayload | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [devices, setDevices] = useState<ManagedDevice[]>([]);
+  const [deviceError, setDeviceError] = useState<string | null>(null);
 
   useEffect(() => {
     getLinkState().then(setLink).catch(() => {});
+    listDevices().then(setDevices).catch(() => {});
     const unlisten = onLinkState(setLink);
+    const unlistenDevices = onDevicesChanged(setDevices);
     return () => {
       unlisten.then((fn) => fn());
+      unlistenDevices.then((fn) => fn());
     };
   }, []);
 
@@ -58,6 +69,15 @@ export function Connection() {
     setCountdown(4);
   };
 
+  const runDeviceAction = async (action: () => Promise<void>) => {
+    setDeviceError(null);
+    try {
+      await action();
+    } catch (error) {
+      setDeviceError(String(error));
+    }
+  };
+
   return (
     <>
       <Section title={t.connection.statusTitle}>
@@ -73,6 +93,64 @@ export function Connection() {
             {t.connection.openBluetooth}
           </button>
         </div>
+      </Section>
+
+      <Section title={t.connection.devicesTitle} description={t.connection.devicesDesc}>
+        {deviceError && <p className="bad-text">{deviceError}</p>}
+        {devices.length === 0 ? (
+          <p className="connection-help">{t.connection.devicesEmpty}</p>
+        ) : (
+          <div className="device-list">
+            {devices.map((device) => (
+              <article className={`device-card ${device.current ? "current" : ""}`} key={device.id}>
+                <div className="device-main">
+                  <div>
+                    <strong>{device.name}</strong>
+                    <span className="device-id">{device.address_hint}</span>
+                  </div>
+                  <div className="device-badges">
+                    {device.preferred && <span className="device-badge preferred">{t.connection.preferred}</span>}
+                    {device.current && <span className="device-badge current">{t.connection.current}</span>}
+                    {!device.enabled && <span className="device-badge paused">{t.connection.paused}</span>}
+                  </div>
+                </div>
+                <p className="device-state">
+                  {device.current
+                    ? device.connected
+                      ? t.connection.deviceConnected
+                      : t.connection.deviceConnecting
+                    : device.online
+                      ? t.connection.deviceOnline
+                      : t.connection.deviceOffline}
+                </p>
+                <div className="device-actions">
+                  {!device.preferred && (
+                    <button className="btn" onClick={() => runDeviceAction(() => setPreferredDevice(device.id))}>
+                      {t.connection.makePreferred}
+                    </button>
+                  )}
+                  <button
+                    className="btn"
+                    onClick={() => runDeviceAction(() => setDeviceEnabled(device.id, !device.enabled))}
+                  >
+                    {device.enabled ? t.connection.pauseDevice : t.connection.enableDevice}
+                  </button>
+                  <button
+                    className="btn danger"
+                    disabled={device.current}
+                    onClick={() => {
+                      if (confirm(t.connection.forgetConfirm)) {
+                        runDeviceAction(() => forgetDevice(device.id));
+                      }
+                    }}
+                  >
+                    {t.connection.forgetDevice}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </Section>
 
       {!link?.ready && (

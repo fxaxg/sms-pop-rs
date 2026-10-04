@@ -31,10 +31,18 @@ const SERVICE_RETRY_DELAY: Duration = Duration::from_secs(2);
 ///   它只在"杀掉残留进程"之后碰巧能过，其实真因是时序。
 pub const SETTLE_BEFORE_SERVICE: Duration = Duration::from_millis(1500);
 
-/// 找一个暴露 ANCS 服务的设备。
+/// 找到的 ANCS 设备候选。
+pub struct DiscoveredDevice {
+    pub device: BluetoothLEDevice,
+    pub id: String,
+    pub name: String,
+    pub connected: bool,
+}
+
+/// 找出所有暴露 ANCS 服务的设备。
 ///
 /// 找不到就一直等（每 2 秒重试），直到超时或者被要求停止。
-pub fn find_device(timeout: Duration, stop: &AtomicBool) -> Result<BluetoothLEDevice> {
+pub fn find_devices(timeout: Duration, stop: &AtomicBool) -> Result<Vec<DiscoveredDevice>> {
     let deadline = Instant::now() + timeout;
     let selector = GattDeviceService::GetDeviceSelectorFromUuid(guid(ANCS_SERVICE_UUID))?;
 
@@ -48,20 +56,34 @@ pub fn find_device(timeout: Duration, stop: &AtomicBool) -> Result<BluetoothLEDe
 
         let count = devices.Size()?;
         if count > 0 {
+            let mut found = Vec::with_capacity(count as usize);
             for index in 0..count {
-                if let Ok(info) = devices.GetAt(index) {
-                    info!(
-                        "发现暴露 ANCS 服务的设备 [{}] name={} id={}",
-                        index,
-                        info.Name().map(|n| n.to_string()).unwrap_or_default(),
-                        info.Id().map(|i| i.to_string()).unwrap_or_default()
-                    );
-                }
+                let info = devices.GetAt(index)?;
+                let device =
+                    match block_on(async { BluetoothLEDevice::FromIdAsync(&info.Id()?)?.await }) {
+                        Ok(device) => device,
+                        Err(error) => {
+                            warn!("打开第 {index} 个 ANCS 候选失败，跳过：{error}");
+                            continue;
+                        }
+                    };
+                let id = device_address(&device);
+                let name = device_name(&device);
+                let connected = is_connected(&device);
+                info!(
+                    "发现 ANCS 候选 [{}] name={} address={} connected={}",
+                    index, name, id, connected
+                );
+                found.push(DiscoveredDevice {
+                    device,
+                    id,
+                    name,
+                    connected,
+                });
             }
-
-            let info = devices.GetAt(0)?;
-            let device = block_on(async { BluetoothLEDevice::FromIdAsync(&info.Id()?)?.await })?;
-            return Ok(device);
+            if !found.is_empty() {
+                return Ok(found);
+            }
         }
 
         if Instant::now() > deadline {

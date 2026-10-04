@@ -91,6 +91,29 @@ export const onLinkState = (handler: (payload: LinkStatePayload) => void) =>
 
 export const sendTestNotification = () => invoke<void>("send_test_notification");
 
+export interface ManagedDevice {
+  id: string;
+  name: string;
+  address_hint: string;
+  preferred: boolean;
+  enabled: boolean;
+  current: boolean;
+  connected: boolean;
+  online: boolean;
+  verified: boolean;
+  last_connected_at: number | null;
+  last_verified_at: number | null;
+}
+
+export const listDevices = () => invoke<ManagedDevice[]>("list_devices");
+export const setPreferredDevice = (id: string) =>
+  invoke<void>("set_preferred_device", { id });
+export const setDeviceEnabled = (id: string, enabled: boolean) =>
+  invoke<void>("set_device_enabled", { id, enabled });
+export const forgetDevice = (id: string) => invoke<void>("forget_device", { id });
+export const onDevicesChanged = (handler: (devices: ManagedDevice[]) => void) =>
+  listen<ManagedDevice[]>("devices-changed", (event) => handler(event.payload));
+
 // ── toast 窗口 ────────────────────────────────────────────────
 
 export interface ToastPayload {

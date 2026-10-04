@@ -17,7 +17,7 @@ use windows::Devices::Bluetooth::BluetoothAdapter;
 use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
 
 use crate::advertiser;
-use crate::discovery::{self, sleep_unless_stopped};
+use crate::discovery::{self, sleep_unless_stopped, DiscoveredDevice};
 use crate::gatt_server;
 use crate::session::{self, NotificationSink};
 use crate::util::block_on;
@@ -76,7 +76,30 @@ pub enum LinkEvent {
     },
     /// 收到一条通知（已经回读完正文）。
     Notification(Box<PhoneNotification>),
+    /// 本轮枚举到的全部候选设备。
+    DevicesDiscovered(Vec<DeviceInfo>),
+    /// 当前实际选择的设备；断开时为 None。
+    ActiveDevice(Option<DeviceInfo>),
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceInfo {
+    pub id: String,
+    pub name: String,
+    pub connected: bool,
+}
+
+impl From<&DiscoveredDevice> for DeviceInfo {
+    fn from(device: &DiscoveredDevice) -> Self {
+        Self {
+            id: device.id.clone(),
+            name: device.name.clone(),
+            connected: device.connected,
+        }
+    }
+}
+
+pub type DeviceSelector = Arc<dyn Fn(&[DeviceInfo]) -> Vec<String> + Send + Sync>;
 
 /// 各个环节的超时与退避。
 #[derive(Debug, Clone)]
@@ -118,6 +141,7 @@ pub struct AncsLink {
     options: LinkOptions,
     sink: Arc<dyn Fn(LinkEvent) + Send + Sync>,
     stop: Arc<AtomicBool>,
+    selector: DeviceSelector,
 }
 
 impl AncsLink {
@@ -126,11 +150,17 @@ impl AncsLink {
             options: LinkOptions::default(),
             sink,
             stop,
+            selector: Arc::new(|devices| devices.iter().map(|device| device.id.clone()).collect()),
         }
     }
 
     pub fn with_options(mut self, options: LinkOptions) -> Self {
         self.options = options;
+        self
+    }
+
+    pub fn with_device_selector(mut self, selector: DeviceSelector) -> Self {
+        self.selector = selector;
         self
     }
 
@@ -233,10 +263,49 @@ impl AncsLink {
 
         self.emit(LinkState::WaitingForConnection, None);
 
-        let device = discovery::find_device(self.options.find_device_timeout, &self.stop)?;
-        let device_id = discovery::device_address(&device);
-        let device_name = discovery::device_name(&device);
+        // 进入新一轮发现时先清空上一轮的在线快照，避免设备已经离开却仍显示在线。
+        (self.sink)(LinkEvent::DevicesDiscovered(Vec::new()));
+        let mut devices = discovery::find_devices(self.options.find_device_timeout, &self.stop)?;
+        let infos: Vec<DeviceInfo> = devices.iter().map(DeviceInfo::from).collect();
+        let order = (self.selector)(&infos);
+        (self.sink)(LinkEvent::DevicesDiscovered(infos.clone()));
+        devices.sort_by_key(|device| {
+            order
+                .iter()
+                .position(|id| id.eq_ignore_ascii_case(&device.id))
+                .unwrap_or(usize::MAX)
+        });
+        devices.retain(|device| order.iter().any(|id| id.eq_ignore_ascii_case(&device.id)));
+
+        if devices.is_empty() {
+            return Err("发现了 iPhone，但所有设备都已在设备管理器中暂停".into());
+        }
+
+        let mut failures = Vec::new();
+        for candidate in devices {
+            match self.run_device_session(candidate) {
+                Ok(outcome) => return Ok(outcome),
+                Err(error) => {
+                    (self.sink)(LinkEvent::ActiveDevice(None));
+                    warn!("设备连接失败，尝试下一台：{error}");
+                    failures.push(error.to_string());
+                }
+            }
+        }
+
+        Err(format!("所有可用 iPhone 都连接失败：{}", failures.join("；")).into())
+    }
+
+    fn run_device_session(&self, candidate: DiscoveredDevice) -> Result<RoundEnd> {
+        let device = candidate.device;
+        let device_id = candidate.id;
+        let device_name = candidate.name;
         info!("选定设备：{device_name}（{device_id}）");
+        (self.sink)(LinkEvent::ActiveDevice(Some(DeviceInfo {
+            id: device_id.clone(),
+            name: device_name.clone(),
+            connected: false,
+        })));
 
         // ★ 不再把 `ConnectionStatus` 当成硬门槛。
         //
@@ -279,6 +348,11 @@ impl AncsLink {
         let session =
             session::AncsSession::open(&device, &device_id, &device_name, notification_sink)?;
 
+        (self.sink)(LinkEvent::ActiveDevice(Some(DeviceInfo {
+            id: device_id.clone(),
+            name: device_name.clone(),
+            connected: true,
+        })));
         self.emit(LinkState::Subscribed, None);
 
         // 守着这条链路，直到断开或者被要求退出。
@@ -303,6 +377,7 @@ impl AncsLink {
         }
 
         session.close();
+        (self.sink)(LinkEvent::ActiveDevice(None));
 
         Ok(if self.stopped() {
             RoundEnd::Stopped

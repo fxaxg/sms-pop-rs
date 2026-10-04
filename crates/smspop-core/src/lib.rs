@@ -13,6 +13,7 @@
 pub mod ancs;
 pub mod config;
 pub mod dedup;
+pub mod devices;
 pub mod filter;
 pub mod insertion;
 pub mod model;

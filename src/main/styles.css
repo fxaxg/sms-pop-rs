@@ -243,6 +243,15 @@
   background: var(--accent-strong);
 }
 
+.btn.danger {
+  color: var(--danger);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ── 连接页 ─────────────────────────────── */
 
 .status-card {
@@ -304,6 +313,59 @@
   display: flex;
   gap: 8px;
   margin-top: 12px;
+}
+
+.device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.device-card {
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.device-card.current {
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border));
+}
+
+.device-main,
+.device-badges,
+.device-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.device-main {
+  justify-content: space-between;
+}
+
+.device-id {
+  margin-left: 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.device-badge {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.device-badge.preferred { color: var(--accent); }
+.device-badge.current { color: var(--success); }
+.device-badge.paused { color: var(--warning); }
+
+.device-state {
+  margin: 7px 0 10px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
 }
 
 .status-detail {

@@ -4,6 +4,7 @@
 
 mod caret;
 mod commands;
+mod devices;
 mod link_worker;
 mod paths;
 mod popups;
@@ -80,6 +81,10 @@ pub fn run() {
             commands::open_logs_dir,
             commands::open_bluetooth_settings,
             commands::get_link_state,
+            commands::list_devices,
+            commands::set_preferred_device,
+            commands::set_device_enabled,
+            commands::forget_device,
             commands::send_test_notification,
             commands::get_toast_payload,
             commands::toast_click,

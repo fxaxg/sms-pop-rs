@@ -25,7 +25,7 @@ pub mod link;
 pub mod session;
 pub mod util;
 
-pub use link::{AncsLink, LinkEvent, LinkOptions, LinkState};
+pub use link::{AncsLink, DeviceInfo, DeviceSelector, LinkEvent, LinkOptions, LinkState};
 pub use session::NotificationSink;
 
 /// 蓝牙层统一错误。

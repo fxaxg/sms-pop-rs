@@ -11,6 +11,7 @@ use smspop_core::dedup::NotificationDeduplicator;
 use smspop_uia::UiaWorker;
 use tauri::AppHandle;
 
+use crate::devices::DeviceRegistry;
 use crate::paths;
 use crate::types::{CaretOffer, ToastPayload};
 
@@ -41,6 +42,8 @@ pub struct AppState {
     /// 订阅 API 返回成功不代表 iPhone 已允许「共享系统通知」；只有收到真实
     /// Notification Source 事件后，UI 才能把链路称为「已就绪」。
     pub link_verified: AtomicBool,
+
+    pub devices: Mutex<DeviceRegistry>,
 
     /// 当前打开的 toast 窗口标签（旧的在前）。
     pub toasts: Mutex<VecDeque<String>>,
@@ -96,6 +99,7 @@ impl AppState {
             link_stop: Arc::new(AtomicBool::new(false)),
             subscribed_at: Mutex::new(None),
             link_verified: AtomicBool::new(false),
+            devices: Mutex::new(DeviceRegistry::load(paths::devices_path(app))),
             toasts: Mutex::new(VecDeque::new()),
             pending_toasts: Mutex::new(HashMap::new()),
             toast_heights: Mutex::new(HashMap::new()),

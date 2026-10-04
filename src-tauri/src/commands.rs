@@ -11,6 +11,7 @@ use smspop_core::model::PhoneNotification;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
+use crate::devices::ManagedDevicePayload;
 use crate::state::AppState;
 use crate::types::{CaretLayout, LinkStatePayload, ToastPayload};
 use crate::{caret, link_worker, paths, popups, tray};
@@ -126,6 +127,48 @@ pub fn get_link_state(app_state: State<'_, AppState>) -> LinkStatePayload {
         ready: verified,
         awaiting_verification: link_state.is_ready() && !verified,
     }
+}
+
+#[tauri::command]
+pub fn list_devices(state: State<'_, AppState>) -> Vec<ManagedDevicePayload> {
+    state
+        .devices
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .payloads()
+}
+
+#[tauri::command]
+pub fn set_preferred_device(app: AppHandle, id: String) -> Result<(), String> {
+    app.state::<AppState>()
+        .devices
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .set_preferred(&id)?;
+    link_worker::emit_devices(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_device_enabled(app: AppHandle, id: String, enabled: bool) -> Result<(), String> {
+    app.state::<AppState>()
+        .devices
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .set_enabled(&id, enabled)?;
+    link_worker::emit_devices(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn forget_device(app: AppHandle, id: String) -> Result<(), String> {
+    app.state::<AppState>()
+        .devices
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .forget(&id)?;
+    link_worker::emit_devices(&app);
+    Ok(())
 }
 
 /// 造一条测试通知，走和真实通知完全相同的路径（去重除外——每次换新 uid）。
