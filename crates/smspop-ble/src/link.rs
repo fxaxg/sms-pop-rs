@@ -208,7 +208,7 @@ impl AncsLink {
         let provider = gatt_server::start()?;
         let publisher = advertiser::start()?;
 
-        let outcome = self.run_session(&provider);
+        let outcome = self.run_session(&provider, &publisher);
 
         advertiser::stop(&publisher);
         gatt_server::stop(&provider);
@@ -219,11 +219,17 @@ impl AncsLink {
 
     fn run_session(
         &self,
-        _provider: &windows::Devices::Bluetooth::GenericAttributeProfile::GattServiceProvider,
+        provider: &gatt_server::GattServerHost,
+        publisher: &advertiser::AncsAdvertiser,
     ) -> Result<RoundEnd> {
         // GATT 广播会和 ANCS 广播抢广告位，可能被挤成 Aborted，
         // 而 Aborted 期间本机不可连接 —— 所以每次进来都确认一次。
-        gatt_server::ensure_advertising(_provider)?;
+        gatt_server::ensure_advertising(provider)?;
+        info!(
+            "首次配对广播检查：GATT={:?} ANCS={:?}",
+            provider.provider().AdvertisementStatus().ok(),
+            publisher.status()
+        );
 
         self.emit(LinkState::WaitingForConnection, None);
 
