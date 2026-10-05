@@ -1,50 +1,102 @@
-# sms-pop-rs
+<div align="center">
+  <img src="src/shared/app-icon.svg" width="112" height="112" alt="SmsPop logo" />
+  <h1>SmsPop</h1>
+  <p><strong>让 iPhone 通知来到 Windows，让验证码少一次切换。</strong></p>
+  <p>通过蓝牙接收通知，复制验证码，按需填入，并打开对应的电脑应用。</p>
+  <p>
+    <a href="https://github.com/fxaxg/sms-pop-rs/actions/workflows/ci.yml"><img src="https://github.com/fxaxg/sms-pop-rs/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-informational" alt="MIT license" /></a>
+    <img src="https://img.shields.io/badge/platform-Windows-555555" alt="Windows" />
+  </p>
+  <p><a href="#开始使用">开始使用</a> · <a href="#连接-iphone">连接 iPhone</a> · <a href="#开发">开发</a> · <a href="CONTRIBUTING.md">参与贡献</a></p>
+</div>
 
-**在 Windows 上接住 iPhone 的通知和验证码。**
+## 它能做什么
 
-iPhone 收到短信验证码 → Windows 右下角弹出通知 → 自动复制到剪贴板 →
-如果光标正好在输入框里，光标旁会出现「填入」候选条 —— **只有你点它才会填入，绝不自动写入。**
+- **接收手机通知**：在屏幕右下角显示 iPhone 通知。
+- **使用验证码**：识别通知中的验证码，可自动复制；在输入框旁提供来源提示与“填入”按钮。
+- **点击打开应用**：按通知来源配置 URL 规则，例如 `weixin://`、`tencent://` 或固定 HTTPS 链接。
+- **后台自动恢复**：手机离开后自动重试连接，返回后重建失效的通知会话。
+- **管理接收偏好**：设备首选、应用与关键词过滤、弹窗时长、开机自启，以及中英文界面。
+- **保持界面安静**：浅色、深色或跟随系统，简单设置自动保存。
 
-基于 Tauri 2 构建，现代简约的界面，开箱即用的新手引导。
+## 开始使用
 
-> 🚧 本项目正在重写中（前身是一个 MVP 实验项目），尚未发布稳定版本。
+项目仍处于早期开发阶段，尚不承诺稳定版兼容性。安装包发布后可从 [Releases](https://github.com/fxaxg/sms-pop-rs/releases) 下载；没有发布资产时，请按下方开发步骤从源码运行。
 
-## 功能
+### 使用条件
 
-- 📱 **通知弹出**（一等公民）：把 iPhone 的通知实时弹到 Windows 上，可按 App / 关键词过滤
-- 🔢 **验证码增强**：自动识别通知里的验证码，复制到剪贴板，并提供光标候选条一键填入
-- 🔒 **绝不自动填入**：全项目只有点击候选条这一个动作会写入别的程序
-- 🌙 开机自启、系统托盘常驻
+- Windows 电脑，蓝牙适配器必须支持 **BLE 外设角色**；仅支持普通蓝牙或 BLE 中心角色并不足够。
+- 支持 ANCS 通知共享的 iPhone，并在系统蓝牙设置中允许通知共享。
+- Windows WebView2 运行时。
 
-## 路线图
+目前只实现 Windows 与 iPhone，尚未支持 Android。不同蓝牙适配器、驱动和 iOS 版本的表现可能不同。
 
-- [x] iPhone 连接（ANCS over BLE）
-- [ ] Tauri 2 全新界面与新手引导
-- [ ] Android 支持（传输层已预留抽象）
+## 连接 iPhone
+
+1. 启动 SmsPop，在“连接”页点击“添加设备”。
+2. 确认电脑和 iPhone 的蓝牙均已开启。
+3. 在 **iPhone 的“设置 → 蓝牙”** 中找到电脑，完成配对。
+4. 允许接收 iPhone 通知。若没有收到提示，点击电脑名称旁的信息按钮，开启 **“共享系统通知”**。
+5. 让 iPhone 收到一条新通知，在电脑上确认接收成功。
+
+本地弹窗测试只验证电脑上的显示与交互，**不验证蓝牙连接**。关闭设置窗口会隐藏到托盘；完全退出请使用托盘菜单。
+
+### 点击通知打开应用
+
+在“通知 → 点击打开应用”添加规则。微信与 QQ 模板分别使用 `weixin://` 和 `tencent://`；目标电脑必须安装并注册对应协议的应用。
+
+点击通知主体或“打开”按钮后，系统将 URL 交给对应应用处理。验证码按钮只复制，不触发打开。此功能不保证进入具体聊天或消息，协议行为取决于目标应用。
+
+## 隐私与边界
+
+通知传输与验证码识别在本机完成，不需要云端转发服务。用户点击配置的 HTTPS 链接或应用协议后，目标浏览器或应用可能访问网络。
+
+- 来源签名（例如 `【网易】`）只是正文提示，不是经过认证的发送方。
+- 过滤规则同时影响弹窗、验证码复制与候选条。
+- 开发版本的日志可能包含通知内容、联系人或验证码。反馈问题前请脱敏，**不要公开上传原始日志或配置文件**。
+- 不承诺任何情况下均不丢通知；休眠、系统权限、驱动及手机通知策略仍需真机验证。
+
+安全问题请阅读 [SECURITY.md](SECURITY.md)，不要在公开 Issue 中披露敏感内容。
 
 ## 开发
 
-环境要求：Rust (MSVC toolchain)、Node.js、Visual Studio Build Tools（C++ 工作负载）、WebView2。
+需要 Rust stable（MSVC 工具链）、Node.js 22、Visual Studio Build Tools 的 C++ 工作负载，以及 WebView2。
 
 ```powershell
-npm install
+npm ci
 npm run tauri dev
 ```
 
-反复测试首次配对时，推荐使用干净测试脚本。它会先清理 Rust/C# ANCS
-测试进程和本仓库遗留的 Vite 进程，等待蓝牙资源释放，再启动开发版；按
-`Ctrl+C` 后还会清理一次：
+### 检查与构建
 
 ```powershell
-pwsh -NoProfile -File .\tools\test-ancs.ps1
-
-# 只清理，不启动
-pwsh -NoProfile -File .\tools\test-ancs.ps1 -CleanOnly
+npm test
+npm run build
+cargo fmt --all -- --check
+cargo test --workspace
+cargo clippy --workspace -- -D warnings
+npm run tauri build
 ```
 
-关闭设置窗口只会隐藏到托盘，并不等于退出应用。普通使用时请从托盘菜单选择
-“退出”；开发测试则优先使用上面的脚本。
+Windows 安装包输出到 `target/release/bundle/nsis/`。应用图标源文件位于 `src/shared/app-icon.svg`。
 
-## License
+### 项目结构
 
-MIT
+| 路径 | 职责 |
+| --- | --- |
+| `crates/smspop-core` | 协议解析、验证码与来源提取、过滤、配置及几何计算 |
+| `crates/smspop-ble` | Windows BLE、ANCS 订阅与连接监督 |
+| `crates/smspop-uia` | 输入框探测与用户触发的写入 |
+| `src-tauri` | 窗口、托盘、通知分发及平台操作 |
+| `src` | 设置窗口、通知弹窗与候选条前端 |
+
+反复验证首次配对时，可使用 `tools/test-ancs.ps1`。它会清理匹配的测试进程和开发服务器，使用前请查看脚本，不要在其他开发任务运行时随意执行。
+
+## 贡献
+
+欢迎提交可复现的问题、设备兼容性结果和改进建议。开发流程、测试要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 许可证
+
+[MIT](LICENSE)。
