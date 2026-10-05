@@ -139,13 +139,13 @@ export const toastResize = (height: number) =>
 // ── 候选条窗口 ────────────────────────────────────────────────
 
 /** [generation, code, durationSecs] */
-export type CaretOfferTuple = [number, string, number];
+export type CaretOfferTuple = [number, string, number, string | null];
 
 export const getCaretOffer = () => invoke<CaretOfferTuple | null>("get_caret_offer");
 export const caretLayout = (generation: number, width: number, height: number) =>
   invoke<void>("caret_layout", { layout: { generation, width, height } });
 export const caretInsert = (generation: number) =>
   invoke<[boolean, string] | null>("caret_insert", { generation });
-export const caretHide = () => invoke<void>("caret_hide");
+export const caretHide = (generation: number) => invoke<void>("caret_hide", { generation });
 export const onCaretOffer = (handler: () => void) =>
   listen<number>("caret-offer", () => handler());

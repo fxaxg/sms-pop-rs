@@ -60,6 +60,14 @@ impl PhoneNotification {
         self.code.as_ref().is_some_and(|code| !code.is_empty())
     }
 
+    /// 保守提取短信正文签名；无法识别时由 UI 显示通用文案。
+    pub fn otp_source_hint(&self) -> Option<String> {
+        if !self.has_code() || self.app_identifier.as_deref() != Some("com.apple.MobileSMS") {
+            return None;
+        }
+        crate::otp_source::extract_sms_source(self.message.as_deref()?)
+    }
+
     /// 内容指纹（设备 + App + 标题 + 正文）。
     ///
     /// 用途：iOS 在每次 ANCS 订阅成功后会把通知中心的存量重推一遍，
@@ -141,6 +149,25 @@ pub fn friendly_app_name(bundle_id: &str) -> String {
 mod tests {
     use super::*;
     use crate::ancs::{ATTR_APP_IDENTIFIER, ATTR_MESSAGE, ATTR_SUBTITLE, ATTR_TITLE};
+
+    #[test]
+    fn 来源提示只识别有验证码的短信正文() {
+        let mut notification = PhoneNotification::from_ancs(
+            "device",
+            None,
+            Attributes {
+                app_identifier: Some("com.apple.MobileSMS".into()),
+                message: Some("【网易】验证码123456".into()),
+                ..Default::default()
+            },
+        );
+        assert_eq!(notification.otp_source_hint(), Some("网易".into()));
+        notification.app_identifier = Some("com.tencent.xin".into());
+        assert_eq!(notification.otp_source_hint(), None);
+        notification.app_identifier = Some("com.apple.MobileSMS".into());
+        notification.code = None;
+        assert_eq!(notification.otp_source_hint(), None);
+    }
 
     fn attributes(uid: u32, tuples: &[(u8, &str)]) -> Attributes {
         let mut attributes = Attributes {

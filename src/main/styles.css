@@ -1,8 +1,22 @@
 /* 设置窗口布局 */
 
+.app-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.titlebar { display: flex; height: 36px; flex-shrink: 0; background: var(--bg); user-select: none; }
+.titlebar-drag { flex: 1; min-width: 0; display: flex; align-items: center; background: linear-gradient(to right, var(--sidebar) 184px, var(--bg) 184px); }
+.titlebar .brand { padding: 0 22px; pointer-events: none; }
+.titlebar .brand-name { font-size: 12px; font-weight: 600; }
+.window-controls { display: flex; flex-shrink: 0; }
+.window-control { width: 46px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 0; padding: 0; background: transparent; color: var(--text); }
+.window-control svg { fill: none; stroke: currentColor; stroke-width: 1; }
+.window-control:hover { background: var(--surface-hover); }
+.window-control.close:hover { background: #c42b1c; color: #ffffff; }
+.window-control:focus-visible { outline-offset: -3px; }
+.window-error { padding: 8px 16px; color: var(--danger); background: var(--surface); font-size: 12px; }
+
 .layout {
   display: flex;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
 }
 
 /* ── 侧边栏 ─────────────────────────────── */
@@ -16,8 +30,6 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  /* 窗口标题栏区域可拖动 */
-  -webkit-app-region: drag;
 }
 
 .sidebar nav {
@@ -44,7 +56,6 @@
 }
 
 .nav-item {
-  -webkit-app-region: no-drag;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -461,6 +472,7 @@
 .local-test .btn { flex-shrink: 0; }
 
 @media (max-width: 760px) {
+  .titlebar-drag { background: linear-gradient(to right, var(--sidebar) 164px, var(--bg) 164px); }
   .sidebar { width: 164px; }
   .content { padding: 24px 24px 88px; }
   .save-bar { left: 164px; padding-inline: 24px; }

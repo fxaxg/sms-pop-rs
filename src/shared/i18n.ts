@@ -16,6 +16,13 @@ export function resolveLang(setting: LanguageSetting): Lang {
 }
 
 const zh = {
+  window: {
+    minimize: "最小化",
+    maximize: "最大化",
+    restore: "还原",
+    close: "关闭到托盘",
+    error: "窗口操作失败",
+  },
   shell: {
     navigation: "设置导航",
     tagline: "手机通知，留在电脑上。",
@@ -173,16 +180,24 @@ const zh = {
     dismiss: "关闭",
   },
   caret: {
+    defaultSource: "验证码",
     fill: "填入",
     filling: "填入中…",
     done: "✓ 已填入",
-    failed: "✗ 写入失败，请手动粘贴（已复制到剪贴板）",
+    failed: "填入失败",
   },
 };
 
 export type Dict = typeof zh;
 
 const en: Dict = {
+  window: {
+    minimize: "Minimize",
+    maximize: "Maximize",
+    restore: "Restore",
+    close: "Close to tray",
+    error: "Window action failed",
+  },
   shell: {
     navigation: "Settings navigation",
     tagline: "Phone notifications. On your PC.",
@@ -339,10 +354,11 @@ const en: Dict = {
     dismiss: "Dismiss",
   },
   caret: {
+    defaultSource: "Verification code",
     fill: "Fill",
     filling: "Filling…",
     done: "✓ Filled",
-    failed: "✗ Failed — paste manually (already copied)",
+    failed: "Insertion failed",
   },
 };
 
