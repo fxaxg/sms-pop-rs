@@ -16,6 +16,7 @@ export function resolveLang(setting: LanguageSetting): Lang {
 }
 
 const zh = {
+  ui: { back: "上一步", next: "下一步", done: "完成", shareTitle: "允许共享系统通知", verifyNote: "关闭引导后，在设备列表确认目标 iPhone。另一台已连接设备的通知不代表新设备已完成配对。", guideHelp: "确认两端蓝牙已开启、手机在附近；关闭此引导不会停止后台自动连接。", advanced: "高级选项", unset: "未设置", configured: (n: number) => `已设置 ${n} 项`, custom: "自定义来源", chooseSource: "通知来源", selectTemplate: "选择来源，配置点击后要打开的应用。", filterNote: "屏蔽规则优先。被过滤的通知不会弹出，也不会触发验证码复制或候选条。", copyHint: "收到验证码时复制，便于手动粘贴", caretHint: "仅点击“填入”时写入，不会自动输入", detect: "识别验证码", popups: "显示通知弹窗", popupHint: "关闭后，启用验证码识别时仍可显示验证码通知。", autoConnectOff: "自动连接已关闭" },
   rules: {
     title: "点击打开应用", desc: "按手机 App 标识匹配。仅点击通知时打开，不自动启动，也不定位到具体聊天。",
     wechat: "微信", mail: "邮件", add: "添加规则", empty: "选择上方模板配置目标应用，或添加自定义来源。",
@@ -156,9 +157,9 @@ const zh = {
     insertionTitle: "填入方式",
     insertionDesc: "绝大多数情况不用动这里。",
     mode: "模式",
-    modeHint: "direct 快且不要求焦点；simulate 适合顽固的输入框",
-    modeDirect: "direct — 直接写入",
-    modeSimulate: "simulate — 模拟键盘",
+    modeHint: "直接填入不兼容时，可尝试模拟键盘",
+    modeDirect: "直接填入（推荐）",
+    modeSimulate: "模拟键盘（兼容模式）",
     typeDelay: "逐字间隔",
   },
   general: {
@@ -200,6 +201,7 @@ const zh = {
 export type Dict = typeof zh;
 
 const en: Dict = {
+  ui: { back: "Back", next: "Next", done: "Done", shareTitle: "Allow notification sharing", verifyNote: "After closing setup, check the intended iPhone in the device list. Notifications from another connected phone do not verify the new device.", guideHelp: "Keep both devices nearby with Bluetooth on. Closing setup does not stop automatic connection.", advanced: "Advanced options", unset: "Not configured", configured: (n: number) => `${n} entries configured`, custom: "Custom source", chooseSource: "Notification source", selectTemplate: "Choose a source and the app to open on click.", filterNote: "Blocked entries take priority. Filtered notifications do not trigger popups, code copying or the candidate bar.", copyHint: "Copy received codes for manual pasting", caretHint: "Inserts only when you click Fill. Never fills automatically.", detect: "Recognize verification codes", popups: "Show notification popups", popupHint: "When disabled, code notifications may still appear if code recognition is enabled.", autoConnectOff: "Automatic connection off" },
   rules: {
     title: "Open apps on click", desc: "Match the phone app ID. Opens only on click; does not navigate to a specific conversation.",
     wechat: "WeChat", mail: "Mail", add: "Add rule", empty: "Configure an app using a template above, or add a custom source.",
@@ -339,9 +341,9 @@ const en: Dict = {
     insertionTitle: "Insertion",
     insertionDesc: "You almost never need to touch this.",
     mode: "Mode",
-    modeHint: "direct is fast and needs no focus; simulate works on stubborn fields",
-    modeDirect: "direct — write value",
-    modeSimulate: "simulate — type keys",
+    modeHint: "Try keyboard simulation if direct insertion is incompatible",
+    modeDirect: "Direct insertion (recommended)",
+    modeSimulate: "Keyboard simulation (compatibility)",
     typeDelay: "Per-key delay",
   },
   general: {

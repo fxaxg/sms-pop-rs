@@ -20,6 +20,8 @@ interface Props {
 export function General({ config, update }: Props) {
   const t = useT();
   const [meta, setMeta] = useState<SettingsMeta | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getSettingsMeta().then(setMeta).catch(() => {});
@@ -39,17 +41,6 @@ export function General({ config, update }: Props) {
             <option value="dark">{t.general.themeDark}</option>
           </select>
         </Row>
-      </Section>
-      <Section title={t.general.startupTitle}>
-        <Row label={t.general.autostart} hint={t.general.autostartHint}>
-          <Toggle
-            checked={meta?.autostart_enabled ?? false}
-            onChange={async (value) => {
-              const enabled = await setAutostart(value).catch(() => value);
-              setMeta((prev) => (prev ? { ...prev, autostart_enabled: enabled } : prev));
-            }}
-          />
-        </Row>
         <Row label={t.general.language} hint={t.general.languageHint}>
           <select
             className="select"
@@ -63,6 +54,17 @@ export function General({ config, update }: Props) {
             <option value="en">English</option>
           </select>
         </Row>
+      </Section>
+      <Section title={t.general.startupTitle}>
+        <Row label={t.general.autostart} hint={t.general.autostartHint}>
+          <Toggle checked={meta?.autostart_enabled ?? false} disabled={!meta || busy} onChange={async (value) => {
+            setBusy(true); setError(null);
+            try { const enabled = await setAutostart(value); setMeta((prev) => prev ? { ...prev, autostart_enabled: enabled } : prev); }
+            catch (err) { setError(String(err)); }
+            finally { setBusy(false); }
+          }} />
+        </Row>
+        {error && <p className="bad-text" role="alert">{error}</p>}
       </Section>
 
       <Section title={t.general.filesTitle}>
