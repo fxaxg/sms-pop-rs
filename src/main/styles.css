@@ -71,6 +71,8 @@
 }
 
 .sidebar-caption { margin-top: auto; padding: 0 10px; color: var(--text-secondary); font-size: 11px; }
+.autosave-status { margin-bottom: 8px; }
+.error-banner .btn { margin-left: 12px; }
 .page-header { margin-bottom: 32px; }
 .page-header h1 { font-size: 23px; font-weight: 600; letter-spacing: -0.5px; margin: 0 0 6px; }
 .page-header p { margin: 0; color: var(--text-secondary); font-size: 13px; }
