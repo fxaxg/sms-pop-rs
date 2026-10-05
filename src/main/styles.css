@@ -288,31 +288,11 @@
   background: var(--danger);
 }
 
-.status-card-main {
-  align-items: flex-start;
-  padding: 18px;
-}
-
-.status-card-main .status-dot {
-  margin-top: 5px;
-}
-
-.status-copy {
-  min-width: 0;
-}
-
-.status-copy p,
 .connection-help {
   margin: 5px 0 0;
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.55;
-}
-
-.connection-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
 }
 
 .device-list {
@@ -403,25 +383,6 @@
 
 .bad-text {
   color: var(--danger) !important;
-}
-
-.technical-details {
-  margin-top: 16px;
-  color: var(--text-secondary);
-  font-size: 12.5px;
-}
-
-.technical-details summary {
-  cursor: pointer;
-}
-
-.technical-details p {
-  margin: 8px 0;
-  white-space: pre-wrap;
-}
-
-.technical-details code {
-  color: var(--text-secondary);
 }
 
 /* ── 保存栏 ─────────────────────────────── */
