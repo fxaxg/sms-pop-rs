@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Icon } from "../shared/Icon";
+import appIcon from "../shared/app-icon.svg";
 import { useT } from "../shared/i18n";
 
 export function Titlebar({ beforeClose }: { beforeClose: () => Promise<void> }) {
@@ -39,7 +39,7 @@ export function Titlebar({ beforeClose }: { beforeClose: () => Promise<void> }) 
             Keep nested decoration pointer-transparent so the entire region works. */}
         <div className="titlebar-drag" data-tauri-drag-region>
           <div className="brand">
-            <Icon name="message" size={19} />
+            <img src={appIcon} width="22" height="22" alt="" />
             <span className="brand-name">SmsPop</span>
           </div>
         </div>
