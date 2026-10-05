@@ -11,6 +11,34 @@ pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
     pollster::block_on(future)
 }
 
+/// 限时驱动异步操作。超时会丢弃等待中的 future，让监督线程恢复控制权。
+/// 这不保证底层 WinRT 操作已经取消，因此超时后调用方必须结束当前会话，不能继续复用。
+pub fn block_on_timeout<F: std::future::Future>(
+    future: F,
+    timeout: std::time::Duration,
+) -> crate::Result<F::Output> {
+    struct WakeThread(std::thread::Thread);
+    impl std::task::Wake for WakeThread {
+        fn wake(self: std::sync::Arc<Self>) {
+            self.0.unpark();
+        }
+    }
+    let waker = std::task::Waker::from(std::sync::Arc::new(WakeThread(std::thread::current())));
+    let mut context = std::task::Context::from_waker(&waker);
+    let mut future = std::pin::pin!(future);
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        if let std::task::Poll::Ready(result) = future.as_mut().poll(&mut context) {
+            return Ok(result);
+        }
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            return Err("蓝牙异步操作超时，结束本轮会话".into());
+        }
+        std::thread::park_timeout(remaining);
+    }
+}
+
 /// 我们的 UUID（RFC 4122 顺序）→ Windows 的 GUID。
 pub fn guid(uuid: Uuid) -> GUID {
     GUID::from_u128(uuid.to_u128())
@@ -35,6 +63,25 @@ pub fn buffer_to_vec(buffer: &IBuffer) -> windows::core::Result<Vec<u8>> {
 mod tests {
     use super::*;
     use smspop_core::ancs::ANCS_SERVICE_UUID;
+
+    #[test]
+    fn 异步等待确实有截止时间() {
+        let started = std::time::Instant::now();
+        assert!(block_on_timeout(
+            std::future::pending::<()>(),
+            std::time::Duration::from_millis(20)
+        )
+        .is_err());
+        assert!(started.elapsed() < std::time::Duration::from_secs(1));
+    }
+
+    #[test]
+    fn 异步完成直接返回结果() {
+        assert_eq!(
+            block_on_timeout(std::future::ready(42), std::time::Duration::from_secs(1)).unwrap(),
+            42
+        );
+    }
 
     #[test]
     // 故意按 UUID 的 8-4-4-4-12 分组，好和文档里的写法对上

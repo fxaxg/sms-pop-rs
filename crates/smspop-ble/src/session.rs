@@ -10,8 +10,9 @@
 //! * Data Source 的长度是**字节**，而且**可能分片** —— 累积到收满 tuple 才算完整
 //! * 同一时刻**只能有一个 Control Point 请求在飞**，所以写入必须串行
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -21,16 +22,22 @@ use smspop_core::model::PhoneNotification;
 use windows::Devices::Bluetooth::BluetoothLEDevice;
 use windows::Devices::Bluetooth::GenericAttributeProfile::{
     GattCharacteristic, GattClientCharacteristicConfigurationDescriptorValue,
-    GattCommunicationStatus, GattDeviceService, GattValueChangedEventArgs, GattWriteOption,
+    GattCommunicationStatus, GattDeviceService, GattSession, GattSessionStatus,
+    GattValueChangedEventArgs, GattWriteOption,
 };
 use windows::Foundation::TypedEventHandler;
 
 use crate::discovery;
-use crate::util::{buffer_to_vec, to_buffer};
+use crate::util::{block_on_timeout, buffer_to_vec, to_buffer};
 use crate::{BleError, Result};
 
 /// 收到一条通知时调用。注意这是**回调线程**，调用方自己负责切线程。
 pub type NotificationSink = Arc<dyn Fn(PhoneNotification) + Send + Sync>;
+
+enum WriterCommand {
+    Fetch([u8; 4]),
+    Stop,
+}
 
 /// 写入 Control Point 的重试次数。
 const WRITE_ATTEMPTS: usize = 3;
@@ -45,11 +52,20 @@ struct Shared {
     data_buffer: Mutex<Vec<u8>>,
     /// 本次请求期望收到几个 tuple —— 收满才算完整。
     expected_tuples: Mutex<usize>,
+    pending_uid: Mutex<Option<u32>>,
+    response_ready: Condvar,
+    stopping: AtomicBool,
+    failed: AtomicBool,
 }
 
 /// 一个活着的 ANCS 会话。drop 或 [`AncsSession::close`] 会退订并停掉写入线程。
 pub struct AncsSession {
+    shared: Arc<Shared>,
+    closed: bool,
     service: GattDeviceService,
+    /// 必须与 ANCS 会话同寿命。只调用 SetMaintainConnection 后立刻丢弃对象，
+    /// Windows 仍可能在空闲后关闭 GATT 会话，而设备级 ConnectionStatus 继续报 Connected。
+    gatt_session: Option<GattSession>,
     notification_source: GattCharacteristic,
     data_source: GattCharacteristic,
 
@@ -57,8 +73,13 @@ pub struct AncsSession {
     _ns_handler: TypedEventHandler<GattCharacteristic, GattValueChangedEventArgs>,
     _ds_handler: TypedEventHandler<GattCharacteristic, GattValueChangedEventArgs>,
 
-    /// 给写入线程送 UID。drop 掉它就等于让线程退出。
-    uid_tx: Option<Sender<[u8; 4]>>,
+    /// WinRT 事件注册令牌。关闭时必须显式移除，否则事件源仍会持有 handler，
+    /// 连带让 Notification Source 回调里的 channel sender 一直存活。
+    ns_token: Option<i64>,
+    ds_token: Option<i64>,
+
+    /// 给写入线程送命令。关闭时显式发 Stop，不能依赖所有 sender 被 drop。
+    writer_tx: Option<Sender<WriterCommand>>,
     writer: Option<JoinHandle<()>>,
 }
 
@@ -80,14 +101,18 @@ impl AncsSession {
 
         // 让 Windows 在链路"看起来断了但其实还在"的时候主动把它拉回来。
         // 两边配对状态不一致时实测有用（几秒内就恢复）。失败不影响主流程。
-        match service.Session() {
+        let gatt_session = match service.Session() {
             Ok(session) => {
                 if let Err(error) = session.SetMaintainConnection(true) {
                     debug!("设置 MaintainConnection 失败（不影响使用）：{error}");
                 }
+                Some(session)
             }
-            Err(error) => debug!("取 GattSession 失败（不影响使用）：{error}"),
-        }
+            Err(error) => {
+                debug!("取 GattSession 失败（不影响使用）：{error}");
+                None
+            }
+        };
 
         let shared = Arc::new(Shared::default());
 
@@ -150,6 +175,14 @@ impl AncsSession {
                             attributes,
                         );
 
+                        let mut pending = ds_shared.pending_uid.lock().unwrap();
+                        if *pending != Some(notification.uid) {
+                            warn!("忽略不属于当前请求的 ANCS 响应");
+                            return Ok(());
+                        }
+                        *pending = None;
+                        ds_shared.response_ready.notify_all();
+                        drop(pending);
                         ds_sink(notification);
                     }
                 }
@@ -158,15 +191,24 @@ impl AncsSession {
             },
         );
 
-        data_source.ValueChanged(&ds_handler)?;
+        let ds_token = match data_source.ValueChanged(&ds_handler) {
+            Ok(token) => token,
+            Err(error) => {
+                if let Some(session) = &gatt_session {
+                    let _ = session.SetMaintainConnection(false);
+                    let _ = session.Close();
+                }
+                return Err(error.into());
+            }
+        };
 
         // ------------------------------------------------------------------
         // Notification Source：只解析事件，真正写 Control Point 交给独立线程
         // ------------------------------------------------------------------
-        let (uid_tx, uid_rx) = mpsc::channel::<[u8; 4]>();
+        let (writer_tx, writer_rx) = mpsc::channel::<WriterCommand>();
 
         // 闭包要把 sender 拿走一份，struct 里还要留一份用来在关闭时断开
-        let ns_uid_tx = uid_tx.clone();
+        let ns_writer_tx = writer_tx.clone();
 
         let ns_handler = TypedEventHandler::<GattCharacteristic, GattValueChangedEventArgs>::new(
             move |_sender, args| {
@@ -196,18 +238,45 @@ impl AncsSession {
                 );
 
                 // ★ 关键：只丢 UID 过去，绝不在这里直接写 Control Point
-                let _ = ns_uid_tx.send([bytes[4], bytes[5], bytes[6], bytes[7]]);
+                let _ = ns_writer_tx.send(WriterCommand::Fetch([
+                    bytes[4], bytes[5], bytes[6], bytes[7],
+                ]));
                 Ok(())
             },
         );
 
-        notification_source.ValueChanged(&ns_handler)?;
+        let ns_token = match notification_source.ValueChanged(&ns_handler) {
+            Ok(token) => token,
+            Err(error) => {
+                let _ = data_source.RemoveValueChanged(ds_token);
+                if let Some(session) = &gatt_session {
+                    let _ = session.SetMaintainConnection(false);
+                    let _ = session.Close();
+                }
+                return Err(error.into());
+            }
+        };
 
         // ------------------------------------------------------------------
         // 订阅 —— ★ 顺序重要：先 Data Source，再 Notification Source
         // ------------------------------------------------------------------
-        let ds_status = subscribe(&data_source)?;
-        let ns_status = subscribe(&notification_source)?;
+        // 先构造资源所有者，后续订阅/起线程失败会自动走 Drop 回滚。
+        let mut session = Self {
+            shared: Arc::clone(&shared),
+            closed: false,
+            service,
+            gatt_session,
+            notification_source,
+            data_source,
+            _ns_handler: ns_handler,
+            _ds_handler: ds_handler,
+            ns_token: Some(ns_token),
+            ds_token: Some(ds_token),
+            writer_tx: Some(writer_tx),
+            writer: None,
+        };
+        let ds_status = subscribe(&session.data_source)?;
+        let ns_status = subscribe(&session.notification_source)?;
 
         info!("订阅结果：NotificationSource={ds_status:?} DataSource={ns_status:?}");
 
@@ -223,30 +292,27 @@ impl AncsSession {
         // Control Point 写入线程（串行化 + 重试）
         // ------------------------------------------------------------------
         let writer_shared = Arc::clone(&shared);
-        let writer = thread::Builder::new()
-            .name("control-point-writer".to_string())
-            .spawn(move || control_point_writer(uid_rx, control_point, writer_shared))
-            .map_err(|error| {
-                BleError::Message(format!("起 Control Point 写入线程失败：{error}"))
-            })?;
+        session.writer = Some(
+            thread::Builder::new()
+                .name("control-point-writer".to_string())
+                .spawn(move || control_point_writer(writer_rx, control_point, writer_shared))
+                .map_err(|error| {
+                    BleError::Message(format!("起 Control Point 写入线程失败：{error}"))
+                })?,
+        );
 
         info!("ANCS 已订阅，开始收通知");
 
-        Ok(Self {
-            service,
-            notification_source,
-            data_source,
-            _ns_handler: ns_handler,
-            _ds_handler: ds_handler,
-            uid_tx: Some(uid_tx),
-            writer: Some(writer),
-        })
+        Ok(session)
     }
 
     /// 链路还在不在。
     pub fn is_connected(&self) -> bool {
-        // 特征还活着就说明服务还在；链路状态由调用方通过 device 查询
-        self.notification_source.Uuid().is_ok()
+        !self.shared.failed.load(Ordering::Relaxed)
+            && self
+                .gatt_session
+                .as_ref()
+                .is_none_or(|session| session.SessionStatus() == Ok(GattSessionStatus::Active))
     }
 
     /// 主动退订并停掉写入线程。
@@ -255,8 +321,33 @@ impl AncsSession {
     }
 
     fn shutdown(&mut self) {
-        // 关掉 channel → 写入线程跳出循环
-        self.uid_tx = None;
+        if self.closed {
+            return;
+        }
+        self.closed = true;
+        info!("开始关闭 ANCS 会话");
+        {
+            let _pending = self.shared.pending_uid.lock().unwrap();
+            self.shared.stopping.store(true, Ordering::Relaxed);
+            self.shared.response_ready.notify_all();
+        }
+        // 先从 WinRT 事件源移除回调。只 drop 本地 delegate 不够：事件源仍会持有它，
+        // 而 Notification Source 回调又持有 writer sender，旧实现因此会永远卡在 join。
+        if let Some(token) = self.ns_token.take() {
+            if let Err(error) = self.notification_source.RemoveValueChanged(token) {
+                debug!("移除 Notification Source 回调失败（通常是链路已断）：{error}");
+            }
+        }
+        if let Some(token) = self.ds_token.take() {
+            if let Err(error) = self.data_source.RemoveValueChanged(token) {
+                debug!("移除 Data Source 回调失败（通常是链路已断）：{error}");
+            }
+        }
+
+        // 显式要求写入线程退出，不再依赖回调中的 sender 何时被释放。
+        if let Some(tx) = self.writer_tx.take() {
+            let _ = tx.send(WriterCommand::Stop);
+        }
 
         if let Some(writer) = self.writer.take() {
             let _ = writer.join();
@@ -264,6 +355,15 @@ impl AncsSession {
 
         unsubscribe(&self.data_source);
         unsubscribe(&self.notification_source);
+
+        if let Some(session) = self.gatt_session.take() {
+            if let Err(error) = session.SetMaintainConnection(false) {
+                debug!("关闭 MaintainConnection 失败（通常是链路已断）：{error}");
+            }
+            if let Err(error) = session.Close() {
+                debug!("关闭 GATT 会话失败（通常是链路已断）：{error}");
+            }
+        }
 
         let _ = &self.service;
         info!("ANCS 会话已关闭");
@@ -278,26 +378,33 @@ impl Drop for AncsSession {
 
 /// 订阅（开通知）。
 fn subscribe(characteristic: &GattCharacteristic) -> Result<GattCommunicationStatus> {
-    Ok(crate::util::block_on(async {
-        characteristic
-            .WriteClientCharacteristicConfigurationDescriptorAsync(
-                GattClientCharacteristicConfigurationDescriptorValue::Notify,
-            )?
-            .await
-    })?)
+    Ok(block_on_timeout(
+        async {
+            characteristic
+                .WriteClientCharacteristicConfigurationDescriptorAsync(
+                    GattClientCharacteristicConfigurationDescriptorValue::Notify,
+                )?
+                .await
+        },
+        Duration::from_secs(8),
+    )??)
 }
 
 fn unsubscribe(characteristic: &GattCharacteristic) {
-    let result = crate::util::block_on(async {
-        characteristic
-            .WriteClientCharacteristicConfigurationDescriptorAsync(
-                GattClientCharacteristicConfigurationDescriptorValue::None,
-            )?
-            .await
-    });
+    let result = block_on_timeout(
+        async {
+            characteristic
+                .WriteClientCharacteristicConfigurationDescriptorAsync(
+                    GattClientCharacteristicConfigurationDescriptorValue::None,
+                )?
+                .await
+        },
+        Duration::from_secs(2),
+    );
 
-    if let Err(error) = result {
-        debug!("退订失败（通常无所谓）：{error}");
+    match result {
+        Ok(Ok(GattCommunicationStatus::Success)) => {}
+        other => debug!("退订未成功（通常是链路已断）：{other:?}"),
     }
 }
 
@@ -322,12 +429,19 @@ fn first_characteristic(
 /// 另外每次都先重置累积状态、设好期望的 tuple 数，再发请求，
 /// 这样 Data Source 那边收到分片时才知道"收满几个才算完整"。
 fn control_point_writer(
-    uid_rx: mpsc::Receiver<[u8; 4]>,
+    command_rx: mpsc::Receiver<WriterCommand>,
     control_point: GattCharacteristic,
     state: Arc<Shared>,
 ) {
-    while let Ok(raw_uid) = uid_rx.recv() {
+    while let Ok(command) = command_rx.recv() {
+        if state.stopping.load(Ordering::Relaxed) {
+            break;
+        }
+        let WriterCommand::Fetch(raw_uid) = command else {
+            break;
+        };
         let mut succeeded = false;
+        *state.pending_uid.lock().unwrap() = Some(u32::from_le_bytes(raw_uid));
 
         for attempt in 1..=WRITE_ATTEMPTS {
             thread::sleep(if attempt == 1 {
@@ -357,17 +471,23 @@ fn control_point_writer(
                 }
             };
 
-            let result = crate::util::block_on(async {
-                control_point
-                    .WriteValueWithResultAndOptionAsync(
-                        &buffer,
-                        GattWriteOption::WriteWithResponse,
-                    )?
-                    .await
-            });
+            if state.stopping.load(Ordering::Relaxed) {
+                return;
+            }
+            let result = block_on_timeout(
+                async {
+                    control_point
+                        .WriteValueWithResultAndOptionAsync(
+                            &buffer,
+                            GattWriteOption::WriteWithResponse,
+                        )?
+                        .await
+                },
+                Duration::from_secs(5),
+            );
 
             match result {
-                Ok(write_result) => {
+                Ok(Ok(write_result)) => {
                     let status = write_result.Status();
 
                     if status == Ok(GattCommunicationStatus::Success) {
@@ -385,14 +505,81 @@ fn control_point_writer(
 
                     warn!("Control Point 写入未成功（第 {attempt} 次）：{status:?}");
                 }
-                Err(error) => warn!("Control Point 写入异常（第 {attempt} 次）：{error}"),
+                Ok(Err(error)) => warn!("Control Point 写入异常（第 {attempt} 次）：{error}"),
+                Err(error) => {
+                    warn!("Control Point 写入超时：{error}");
+                    state.failed.store(true, Ordering::Relaxed);
+                    return;
+                }
             }
         }
 
         if !succeeded {
             warn!("Control Point 三次都没写成功，放弃这条通知");
+            state.failed.store(true, Ordering::Relaxed);
+            return;
+        }
+        // 写入成功只意味着请求被接收；完整 Data Source 响应回来才允许下一条请求。
+        let pending = state.pending_uid.lock().unwrap();
+        let (pending, _) = state
+            .response_ready
+            .wait_timeout_while(pending, Duration::from_secs(8), |uid| {
+                uid.is_some() && !state.stopping.load(Ordering::Relaxed)
+            })
+            .unwrap();
+        if state.stopping.load(Ordering::Relaxed) {
+            return;
+        }
+        if pending.is_some() {
+            warn!("ANCS 属性响应超时，要求重建会话");
+            state.failed.store(true, Ordering::Relaxed);
+            return;
         }
     }
 
     debug!("Control Point 写入线程退出");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn 停止消息不依赖回调发送端释放() {
+        let (tx, rx) = mpsc::channel();
+        let callback_tx = tx.clone();
+        tx.send(WriterCommand::Stop).unwrap();
+        drop(tx);
+        assert!(matches!(
+            rx.recv_timeout(Duration::from_millis(100)).unwrap(),
+            WriterCommand::Stop
+        ));
+        // 模拟 WinRT 仍持有回调的情形：回调 sender 还活着，Stop 仍然能被消费。
+        drop(callback_tx);
+    }
+
+    #[test]
+    fn 关闭会话唤醒等待响应的线程() {
+        let shared = Arc::new(Shared::default());
+        *shared.pending_uid.lock().unwrap() = Some(123);
+        let waiter_shared = Arc::clone(&shared);
+        let (done_tx, done_rx) = mpsc::channel();
+        let waiter = thread::spawn(move || {
+            let pending = waiter_shared.pending_uid.lock().unwrap();
+            let _result = waiter_shared
+                .response_ready
+                .wait_timeout_while(pending, Duration::from_secs(8), |uid| {
+                    uid.is_some() && !waiter_shared.stopping.load(Ordering::Relaxed)
+                })
+                .unwrap();
+            done_tx.send(()).unwrap();
+        });
+        {
+            let _pending = shared.pending_uid.lock().unwrap();
+            shared.stopping.store(true, Ordering::Relaxed);
+            shared.response_ready.notify_all();
+        }
+        done_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        waiter.join().unwrap();
+    }
 }
