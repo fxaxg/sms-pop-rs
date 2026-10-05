@@ -60,6 +60,7 @@ pub struct CaretOffer {
     /// 单调递增的代数 —— 防止迟到的布局/隐藏请求误伤新提议。
     pub generation: u64,
     pub code: String,
+    pub source_hint: Option<String>,
     /// 光标矩形（DIP）。
     pub caret: RectD,
     /// 光标所在显示器的工作区（DIP）。

@@ -223,7 +223,7 @@ pub fn dispatch_notification(app: &AppHandle, notification: PhoneNotification) {
     //    开 N 秒监听窗：等焦点落进输入框再弹，而不是只认到达瞬间。
     if offer_otp && config.otp.caret.enabled {
         if let Some(code) = notification.code.clone() {
-            caret::watch(app, code);
+            caret::watch(app, code, notification.otp_source_hint());
         }
     }
 }

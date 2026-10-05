@@ -8,6 +8,7 @@ import { General } from "./sections/General";
 import { Icon, type IconName } from "../shared/Icon";
 import { applyTheme } from "../shared/theme";
 import { AutoSave, type SaveStatus } from "../shared/autosave";
+import { Titlebar } from "./Titlebar";
 
 type Page = "connection" | "notifications" | "otp" | "general";
 
@@ -86,6 +87,7 @@ export function App() {
         saveError={saveError}
         error={error}
         retry={() => { void autosave.flush(); }}
+        beforeClose={() => autosave.flush()}
       />
     </LangContext.Provider>
   );
@@ -100,9 +102,10 @@ function Shell(props: {
   saveError: string | null;
   error: string | null;
   retry: () => void;
+  beforeClose: () => Promise<void>;
 }) {
   const t = useT();
-  const { page, setPage, config, update, saveStatus, saveError, error, retry } = props;
+  const { page, setPage, config, update, saveStatus, saveError, error, retry, beforeClose } = props;
 
   const nav: { key: Page; label: string }[] = [
     { key: "connection", label: t.nav.connection },
@@ -112,12 +115,10 @@ function Shell(props: {
   ];
 
   return (
-    <div className="layout">
+    <div className="app-shell">
+      <Titlebar beforeClose={beforeClose} />
+      <div className="layout">
       <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-icon"><Icon name="message" size={22} /></span>
-          <span className="brand-name">SmsPop</span>
-        </div>
         <nav aria-label={t.shell.navigation}>
           {nav.map((item) => (
             <button
@@ -161,7 +162,7 @@ function Shell(props: {
           <p className="loading">{t.common.loading}</p>
         )}
       </main>
-
+      </div>
     </div>
   );
 }

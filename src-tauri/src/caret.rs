@@ -42,7 +42,7 @@ const EDGE_PADDING: f64 = 8.0;
 /// 收到验证码：开一个监听窗，等焦点落进输入框再弹候选条。
 ///
 /// 立即返回（监听跑在独立线程上）。新的验证码会取代旧的监听。
-pub fn watch(app: &AppHandle, code: String) {
+pub fn watch(app: &AppHandle, code: String, source_hint: Option<String>) {
     let state = app.state::<AppState>();
     let config = state.config();
 
@@ -62,7 +62,15 @@ pub fn watch(app: &AppHandle, code: String) {
     let _ = std::thread::Builder::new()
         .name("caret-watch".to_string())
         .spawn(move || {
-            watch_loop(&app, generation, code, window_secs, duration_secs, gap);
+            watch_loop(
+                &app,
+                generation,
+                code,
+                source_hint,
+                window_secs,
+                duration_secs,
+                gap,
+            );
         });
 }
 
@@ -73,6 +81,7 @@ fn watch_loop(
     app: &AppHandle,
     generation: u64,
     code: String,
+    source_hint: Option<String>,
     window_secs: u64,
     duration_secs: u32,
     gap: f64,
@@ -97,7 +106,15 @@ fn watch_loop(
 
         match outcome {
             Some(ProbeOutcome::Found(target)) if target.editable && target.caret.is_some() => {
-                show_bar(app, generation, code, target, duration_secs, gap);
+                show_bar(
+                    app,
+                    generation,
+                    code,
+                    source_hint,
+                    target,
+                    duration_secs,
+                    gap,
+                );
                 return;
             }
             // UIA 挂了（worker 退出）—— 再轮询也没意义
@@ -117,6 +134,7 @@ fn show_bar(
     app: &AppHandle,
     generation: u64,
     code: String,
+    source_hint: Option<String>,
     target: FocusTarget,
     duration_secs: u32,
     gap: f64,
@@ -138,6 +156,7 @@ fn show_bar(
         *offer = Some(CaretOffer {
             generation,
             code,
+            source_hint,
             caret: caret_dips,
             work_area,
             scale: dpi as f64 / 96.0,
@@ -256,7 +275,7 @@ fn hide_window(app: &AppHandle) {
     }
 }
 
-fn hide_if_generation(app: &AppHandle, generation: u64) {
+pub fn hide_if_generation(app: &AppHandle, generation: u64) {
     if current_generation(app) != generation {
         return; // 期间来了新提议，别动
     }

@@ -10,6 +10,7 @@ import {
 } from "../shared/api";
 import { dict, resolveLang, type Lang } from "../shared/i18n";
 import { useSavedTheme } from "../shared/theme";
+import { Icon } from "../shared/Icon";
 
 type Phase = "ready" | "inserting" | "done" | "failed";
 
@@ -25,7 +26,10 @@ export function CaretApp() {
   const [offer, setOffer] = useState<CaretOfferTuple | null>(null);
   const [phase, setPhase] = useState<Phase>("ready");
   const [lang, setLang] = useState<Lang>("zh");
-  const pillRef = useRef<HTMLButtonElement>(null);
+  const pillRef = useRef<HTMLDivElement>(null);
+  const generationRef = useRef<number | null>(null);
+  const refreshVersion = useRef(0);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     getConfig()
@@ -34,7 +38,11 @@ export function CaretApp() {
   }, []);
 
   const refresh = useCallback(async () => {
+    const version = ++refreshVersion.current;
     const next = await getCaretOffer().catch(() => null);
+    if (version !== refreshVersion.current) return;
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    generationRef.current = next?.[0] ?? null;
     setOffer(next);
     setPhase("ready");
   }, []);
@@ -43,54 +51,76 @@ export function CaretApp() {
     refresh();
     const unlisten = onCaretOffer(refresh);
     return () => {
+      ++refreshVersion.current;
+      generationRef.current = null;
+      if (hideTimer.current) clearTimeout(hideTimer.current);
       unlisten.then((fn) => fn());
     };
   }, [refresh]);
 
-  // 渲染完成后把真实尺寸报给 Rust 布局
-  // （用 right/bottom 而不是 width/height：把 body 给阴影留的 padding 也算进去）
+  // Measure untransformed layout size plus all four transparent shadow gutters.
   useEffect(() => {
-    if (!offer || phase !== "ready" || !pillRef.current) return;
-    const rect = pillRef.current.getBoundingClientRect();
-    caretLayout(offer[0], Math.ceil(rect.right), Math.ceil(rect.bottom));
-  }, [offer, phase]);
+    if (!offer || !pillRef.current) return;
+    const pill = pillRef.current;
+    let previous = "";
+    const measure = () => {
+      const style = getComputedStyle(document.body);
+      const width = Math.ceil(pill.offsetWidth + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight));
+      const height = Math.ceil(pill.offsetHeight + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom));
+      const key = `${width}:${height}`;
+      if (key === previous) return;
+      previous = key;
+      void caretLayout(offer[0], width, height).catch(() => {});
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(pill);
+    return () => observer.disconnect();
+  }, [offer, phase, lang]);
 
   if (!offer) return null;
 
   const t = dict(lang);
-  const [generation, code] = offer;
+  const [generation, code, , sourceHint] = offer;
 
   const onInsert = async () => {
     if (phase !== "ready") return;
     setPhase("inserting");
     const result = await caretInsert(generation).catch(() => null);
+    if (generationRef.current !== generation) return;
 
     if (result?.[0]) {
       setPhase("done");
-      setTimeout(() => caretHide(), 900);
+      hideTimer.current = setTimeout(() => { void caretHide(generation).catch(() => {}); }, 900);
     } else {
       // 失败详情 Rust 侧已记日志；界面给统一的人话
       setPhase("failed");
-      setTimeout(() => caretHide(), 1800);
+      hideTimer.current = setTimeout(() => { void caretHide(generation).catch(() => {}); }, 1800);
     }
   };
 
   return (
-    <button
+    <div
       ref={pillRef}
       className={`pill ${phase}`}
-      onClick={onInsert}
-      disabled={phase === "inserting"}
+      role="group"
+      aria-label={t.caret.defaultSource}
     >
-      {phase === "ready" && (
-        <>
-          <span className="pill-action">{t.caret.fill}</span>
-          <span className="pill-code">{code}</span>
-        </>
-      )}
-      {phase === "inserting" && <span>{t.caret.filling}</span>}
-      {phase === "done" && <span>{t.caret.done}</span>}
-      {phase === "failed" && <span>{t.caret.failed}</span>}
-    </button>
+      <span className="pill-identity">
+        <Icon name="code" size={17} />
+        <span className="pill-source" title={sourceHint ?? t.caret.defaultSource}>{sourceHint ?? t.caret.defaultSource}</span>
+      </span>
+      <span className="pill-code">{code}</span>
+      <button className="pill-action" onClick={onInsert} disabled={phase !== "ready"}
+        aria-label={`${t.caret.fill} ${code}`}>
+        {/* All labels participate in sizing so asynchronous feedback never shifts the bar. */}
+        {["ready", "inserting", "done", "failed"].map((state) => (
+          <span key={state} className={`pill-action-label ${phase === state ? "visible" : ""}`} aria-hidden={phase !== state}>
+            {state === "ready" ? t.caret.fill : state === "inserting" ? t.caret.filling : state === "done" ? t.caret.done : t.caret.failed}
+          </span>
+        ))}
+      </button>
+      <span className="sr-only" role="status">{phase === "ready" ? "" : phase === "inserting" ? t.caret.filling : phase === "done" ? t.caret.done : t.caret.failed}</span>
+    </div>
   );
 }
