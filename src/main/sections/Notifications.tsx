@@ -1,6 +1,7 @@
 import type { Config } from "../../shared/api";
 import { useT } from "../../shared/i18n";
 import { NumberField, Row, Section, TextList, Toggle } from "../components";
+import { AppRules } from "./AppRules";
 
 interface Props {
   config: Config;
@@ -44,6 +45,7 @@ export function Notifications({ config, update }: Props) {
         </Row>
       </Section>
 
+      <AppRules config={config} update={update} />
       <Section title={t.notifications.filterTitle} description={t.notifications.filterDesc}>
         <Row label={t.notifications.excludeApps} hint={t.notifications.excludeAppsHint}>
           <TextList

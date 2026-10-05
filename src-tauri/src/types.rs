@@ -44,6 +44,8 @@ pub struct LinkStatePayload {
 /// 一条 toast 弹窗的展示负载。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToastPayload {
+    pub app_id: Option<String>,
+    pub open_app_name: Option<String>,
     /// 来源行（发件人 / App 名）。
     pub origin: String,
     /// 正文摘要。

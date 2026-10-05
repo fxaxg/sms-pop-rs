@@ -25,6 +25,17 @@ pub fn get_config(state: State<'_, AppState>) -> Config {
 
 #[tauri::command]
 pub fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
+    for (index, rule) in config.notifications.app_rules.iter().enumerate() {
+        if rule.enabled {
+            rule.validate()?;
+            if config.notifications.app_rules[..index]
+                .iter()
+                .any(|other| other.enabled && other.app_id.eq_ignore_ascii_case(&rule.app_id))
+            {
+                return Err("同一来源只能启用一条打开规则".into());
+            }
+        }
+    }
     let path = paths::config_path(&app);
 
     config
@@ -212,6 +223,45 @@ pub fn send_test_notification_from(app: AppHandle) {
 }
 
 // ── toast 窗口 ────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn validate_app_rule(
+    window: tauri::WebviewWindow,
+    rule: smspop_core::app_rules::AppRule,
+) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("仅设置窗口可以配置规则".into());
+    }
+    rule.validate()
+}
+
+#[tauri::command]
+pub fn test_app_rule(
+    window: tauri::WebviewWindow,
+    rule: smspop_core::app_rules::AppRule,
+) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("仅设置窗口可以测试规则".into());
+    }
+    crate::app_launcher::open(&rule)
+}
+
+#[tauri::command]
+pub fn toast_open_app(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    let app_id = app
+        .state::<AppState>()
+        .pending_toasts
+        .lock()
+        .unwrap()
+        .get(window.label())
+        .and_then(|payload| payload.app_id.clone())
+        .ok_or("通知已过期或没有来源")?;
+    let config = app.state::<AppState>().config();
+    let rule =
+        smspop_core::app_rules::matching_rule(&config.notifications.app_rules, Some(&app_id))
+            .ok_or("没有启用的打开规则")?;
+    crate::app_launcher::open(rule)
+}
 
 /// toast 前端加载完成后主动来取自己的负载。
 #[tauri::command]
