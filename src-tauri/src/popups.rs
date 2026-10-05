@@ -52,6 +52,12 @@ pub fn show(app: &AppHandle, notification: &PhoneNotification) {
     let label = format!("toast-{id}");
 
     let payload = ToastPayload {
+        app_id: notification.app_identifier.clone(),
+        open_app_name: smspop_core::app_rules::matching_rule(
+            &config.notifications.app_rules,
+            notification.app_identifier.as_deref(),
+        )
+        .map(|rule| rule.name.clone()),
         origin: notification.origin(),
         body: notification.summary(),
         code: notification.code.clone(),

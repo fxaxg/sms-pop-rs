@@ -5,6 +5,7 @@ import {
   toastClick,
   toastClose,
   toastResize,
+  toastOpenApp,
   type ToastPayload,
 } from "../shared/api";
 import { dict, resolveLang, type Lang } from "../shared/i18n";
@@ -21,6 +22,8 @@ export function ToastApp() {
   useSavedTheme();
   const [payload, setPayload] = useState<ToastPayload | null>(null);
   const [copied, setCopied] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [lang, setLang] = useState<Lang>("zh");
 
   useEffect(() => {
@@ -46,7 +49,7 @@ export function ToastApp() {
     if (!card) return;
     const height = Math.ceil(card.getBoundingClientRect().height) + 8; // body 上下各 4px 阴影留白
     toastResize(height);
-  }, [payload]);
+  }, [payload, error, lang]);
 
   if (!payload) {
     return null;
@@ -54,7 +57,7 @@ export function ToastApp() {
 
   const t = dict(lang);
 
-  const onClick = async () => {
+  const onCopy = async () => {
     if (copied) return;
     const code = await toastClick().catch(() => null);
     if (code) {
@@ -65,17 +68,29 @@ export function ToastApp() {
     }
   };
 
+  const onClick = async () => {
+    if (!payload.open_app_name) { await onCopy(); return; }
+    if (opening) return;
+    setOpening(true); setError(null);
+    try { await toastOpenApp(); await toastClose(); }
+    catch (err) { setError(String(err)); setOpening(false); }
+  };
+
   return (
     <div className="toast" onClick={onClick}>
       <div className="toast-icon"><Icon name={payload.code ? "code" : "message"} size={20} /></div>
       <div className="toast-text">
         <div className="toast-origin">{payload.origin}</div>
         <div className="toast-body">{payload.body}</div>
+        {(payload.code || payload.open_app_name) && <div className="toast-actions">
         {payload.code && (
-          <div className={`toast-code ${copied ? "copied" : ""}`}>
+          <button className={`toast-code ${copied ? "copied" : ""}`} onClick={(event) => { event.stopPropagation(); void onCopy(); }}>
             {copied ? t.toast.copied : t.toast.copyCode(payload.code)}
-          </div>
+          </button>
         )}
+        {payload.open_app_name && <button className="toast-open" disabled={opening} onClick={(event) => { event.stopPropagation(); void onClick(); }}>{opening ? t.rules.opening : t.rules.open(payload.open_app_name)}</button>}
+        </div>}
+        {error && <p className="toast-error" role="alert">{error}</p>}
       </div>
       <button
         className="toast-dismiss"

@@ -11,6 +11,7 @@
 //! * [`config`] —— 配置模型
 
 pub mod ancs;
+pub mod app_rules;
 pub mod config;
 pub mod dedup;
 pub mod devices;

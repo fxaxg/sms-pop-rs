@@ -2,6 +2,7 @@
 //!
 //! 组装：插件 → 全局状态 → 托盘 → 蓝牙链路线程 → 命令。
 
+mod app_launcher;
 mod caret;
 mod commands;
 mod devices;
@@ -88,6 +89,9 @@ pub fn run() {
             commands::send_test_notification,
             commands::get_toast_payload,
             commands::toast_click,
+            commands::toast_open_app,
+            commands::test_app_rule,
+            commands::validate_app_rule,
             commands::toast_close,
             commands::toast_resize,
             commands::get_caret_offer,

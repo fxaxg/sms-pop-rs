@@ -85,6 +85,7 @@ impl Config {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NotificationOptions {
+    pub app_rules: Vec<crate::app_rules::AppRule>,
     /// 总开关。关掉之后只剩验证码通知（如果验证码增强开着）。
     pub enabled: bool,
 
@@ -98,6 +99,7 @@ pub struct NotificationOptions {
 impl Default for NotificationOptions {
     fn default() -> Self {
         Self {
+            app_rules: Vec::new(),
             enabled: true,
             filter: FilterOptions::default(),
             popup: PopupOptions::default(),

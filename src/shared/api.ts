@@ -22,10 +22,21 @@ export interface PopupOptions {
 }
 
 export interface NotificationOptions {
+  app_rules: AppRule[];
   enabled: boolean;
   filter: FilterOptions;
   popup: PopupOptions;
 }
+
+export interface AppRule {
+  app_id: string;
+  name: string;
+  enabled: boolean;
+  target: string;
+}
+export const testAppRule = (rule: AppRule) => invoke<void>("test_app_rule", { rule });
+export const validateAppRule = (rule: AppRule) => invoke<void>("validate_app_rule", { rule });
+export const toastOpenApp = () => invoke<void>("toast_open_app");
 
 export interface CaretOptions {
   enabled: boolean;
@@ -122,6 +133,8 @@ export const onDevicesChanged = (handler: (devices: ManagedDevice[]) => void) =>
 // ── toast 窗口 ────────────────────────────────────────────────
 
 export interface ToastPayload {
+  app_id: string | null;
+  open_app_name: string | null;
   origin: string;
   body: string;
   code: string | null;

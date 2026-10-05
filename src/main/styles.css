@@ -451,6 +451,16 @@
   color: var(--text-faint);
 }
 
+.rule-presets, .rule-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rule-presets { margin-bottom: 12px; }
+.app-rule { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.app-rule-info { display: flex; flex-direction: column; min-width: 0; }
+.app-rule-info small { color: var(--text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rule-controls { flex-shrink: 0; }
+.rule-editor { margin-top: 14px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; gap: 12px; }
+.rule-editor label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.rule-editor input, .rule-editor select { padding: 7px 9px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); width: 100%; }
+
 .connection-toolbar { display: flex; justify-content: flex-end; margin: 18px 0 14px; }
 .device-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .device-identity strong { overflow-wrap: anywhere; }

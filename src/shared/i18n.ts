@@ -16,6 +16,15 @@ export function resolveLang(setting: LanguageSetting): Lang {
 }
 
 const zh = {
+  rules: {
+    title: "点击打开应用", desc: "按手机 App 标识匹配。仅点击通知时打开，不自动启动，也不定位到具体聊天。",
+    wechat: "微信", mail: "邮件", add: "添加规则", empty: "选择上方模板配置目标应用，或添加自定义来源。",
+    name: "规则名称", source: "手机 App 标识", kind: "打开方式", executable: "本地应用 (.exe)", https: "网页 (HTTPS)",
+    target: "打开 URL", targetHint: "填写应用 URL Scheme（如 weixin://、tencent://）或 HTTPS 链接。协议由对应应用处理，不支持程序路径、命令或通知正文变量。",
+    test: "测试打开", cancel: "取消", apply: "应用规则", edit: "编辑", remove: "删除", removeConfirm: "删除这条打开规则？",
+    required: "请填写名称、来源标识和打开目标。", duplicate: "该来源已有启用的规则。", invalid: "请输入应用 URL Scheme 或 HTTPS 链接。",
+    open: (name: string) => `打开 ${name}`, opening: "正在打开…",
+  },
   window: {
     minimize: "最小化",
     maximize: "最大化",
@@ -191,6 +200,15 @@ const zh = {
 export type Dict = typeof zh;
 
 const en: Dict = {
+  rules: {
+    title: "Open apps on click", desc: "Match the phone app ID. Opens only on click; does not navigate to a specific conversation.",
+    wechat: "WeChat", mail: "Mail", add: "Add rule", empty: "Configure an app using a template above, or add a custom source.",
+    name: "Rule name", source: "Phone app ID", kind: "Action type", executable: "Local app (.exe)", https: "Website (HTTPS)",
+    target: "Target URL", targetHint: "Enter an app URL scheme (weixin://, tencent://) or HTTPS link. Handled by the target app. No executable paths, commands or notification variables.",
+    test: "Test launch", cancel: "Cancel", apply: "Apply rule", edit: "Edit", remove: "Delete", removeConfirm: "Delete this launch rule?",
+    required: "Enter a name, source app ID and target.", duplicate: "This source already has an enabled rule.", invalid: "Enter an app URL scheme or HTTPS URL.",
+    open: (name: string) => `Open ${name}`, opening: "Opening…",
+  },
   window: {
     minimize: "Minimize",
     maximize: "Maximize",
