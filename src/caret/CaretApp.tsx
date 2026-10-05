@@ -9,6 +9,7 @@ import {
   type CaretOfferTuple,
 } from "../shared/api";
 import { dict, resolveLang, type Lang } from "../shared/i18n";
+import { useSavedTheme } from "../shared/theme";
 
 type Phase = "ready" | "inserting" | "done" | "failed";
 
@@ -20,6 +21,7 @@ type Phase = "ready" | "inserting" | "done" | "failed";
  * 点「填入」→ Rust 写入 → 显示结果 → 收起。
  */
 export function CaretApp() {
+  useSavedTheme();
   const [offer, setOffer] = useState<CaretOfferTuple | null>(null);
   const [phase, setPhase] = useState<Phase>("ready");
   const [lang, setLang] = useState<Lang>("zh");

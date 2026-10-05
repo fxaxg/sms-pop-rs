@@ -8,7 +8,7 @@ use serde::Serialize;
 use smspop_core::ancs::Attributes;
 use smspop_core::config::Config;
 use smspop_core::model::PhoneNotification;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
 use crate::devices::ManagedDevicePayload;
@@ -31,7 +31,11 @@ pub fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
         .save(&path)
         .map_err(|error| format!("保存配置失败：{error}"))?;
 
+    let theme = config.general.theme;
     app.state::<AppState>().apply_config(config);
+    if let Err(error) = app.emit("theme-changed", theme) {
+        warn!("广播外观设置失败：{error}");
+    }
     info!("配置已保存");
 
     Ok(())

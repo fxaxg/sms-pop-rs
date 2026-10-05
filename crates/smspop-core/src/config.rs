@@ -30,12 +30,24 @@ pub struct Config {
 pub struct GeneralOptions {
     /// 界面语言：`auto`（跟随系统）/ `zh-CN` / `en`。
     pub language: String,
+    /// 外观：默认跟随系统，也可固定浅色或深色。
+    pub theme: Theme,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Theme {
+    #[default]
+    Auto,
+    Light,
+    Dark,
 }
 
 impl Default for GeneralOptions {
     fn default() -> Self {
         Self {
             language: "auto".to_string(),
+            theme: Theme::Auto,
         }
     }
 }
@@ -359,7 +371,9 @@ pub const DEFAULT_CONFIG_JSON: &str = r#"{
   // ── 通用 ────────────────────────────────────────────────────
   "general": {
     // 界面语言：auto（跟随系统）/ zh-CN / en
-    "language": "auto"
+    "language": "auto",
+    // 外观：auto（跟随系统）/ light / dark
+    "theme": "auto"
   }
 }
 "#;
@@ -416,6 +430,26 @@ mod tests {
     use super::*;
     use crate::ancs::Attributes;
     use crate::model::PhoneNotification;
+
+    #[test]
+    fn 旧配置默认跟随系统主题() {
+        let config = Config::from_json_str(r#"{"general":{"language":"en"}}"#).unwrap();
+        assert_eq!(config.general.theme, Theme::Auto);
+        assert_eq!(config.general.language, "en");
+    }
+
+    #[test]
+    fn 主题配置往返且拒绝非法值() {
+        for theme in [Theme::Auto, Theme::Light, Theme::Dark] {
+            let mut config = Config::default();
+            config.general.theme = theme;
+            assert_eq!(
+                Config::from_json_str(&config.to_json_string()).unwrap(),
+                config
+            );
+        }
+        assert!(Config::from_json_str(r#"{"general":{"theme":"purple"}}"#).is_err());
+    }
 
     fn notification_with_code(code: Option<&str>) -> PhoneNotification {
         let mut notification = PhoneNotification::from_ancs(

@@ -8,6 +8,8 @@ import {
   type ToastPayload,
 } from "../shared/api";
 import { dict, resolveLang, type Lang } from "../shared/i18n";
+import { Icon } from "../shared/Icon";
+import { useSavedTheme } from "../shared/theme";
 
 /**
  * 右下角通知弹窗。
@@ -16,6 +18,7 @@ import { dict, resolveLang, type Lang } from "../shared/i18n";
  * 点击：有验证码 → 复制 + 短暂反馈；无验证码 → 直接关闭。
  */
 export function ToastApp() {
+  useSavedTheme();
   const [payload, setPayload] = useState<ToastPayload | null>(null);
   const [copied, setCopied] = useState(false);
   const [lang, setLang] = useState<Lang>("zh");
@@ -64,7 +67,7 @@ export function ToastApp() {
 
   return (
     <div className="toast" onClick={onClick}>
-      <div className="toast-icon">{payload.code ? "🔢" : "💬"}</div>
+      <div className="toast-icon"><Icon name={payload.code ? "code" : "message"} size={20} /></div>
       <div className="toast-text">
         <div className="toast-origin">{payload.origin}</div>
         <div className="toast-body">{payload.body}</div>
