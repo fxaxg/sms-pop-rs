@@ -31,6 +31,10 @@ const zh = {
     general: "通用",
   },
   common: {
+    autoSave: "设置自动保存",
+    saving: "正在保存…",
+    saveFailed: "保存失败，改动尚未生效",
+    retry: "重试",
     save: "保存",
     saved: "✓ 已保存",
     unsaved: "有未保存的修改",
@@ -144,7 +148,7 @@ const zh = {
   general: {
     appearanceTitle: "外观",
     theme: "主题",
-    themeHint: "当前窗口即时预览，保存后应用到通知弹窗与候选条",
+    themeHint: "自动保存，并同步到通知弹窗与候选条",
     themeLight: "浅色",
     themeDark: "深色",
     startupTitle: "启动",
@@ -194,6 +198,10 @@ const en: Dict = {
     general: "General",
   },
   common: {
+    autoSave: "Settings save automatically",
+    saving: "Saving…",
+    saveFailed: "Save failed; changes not applied",
+    retry: "Retry",
     save: "Save",
     saved: "✓ Saved",
     unsaved: "Unsaved changes",
@@ -306,7 +314,7 @@ const en: Dict = {
   general: {
     appearanceTitle: "Appearance",
     theme: "Theme",
-    themeHint: "Preview here immediately. Save to apply to popups and the candidate bar.",
+    themeHint: "Saves automatically and syncs with popups and the candidate bar.",
     themeLight: "Light",
     themeDark: "Dark",
     startupTitle: "Startup",

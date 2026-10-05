@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getConfig, saveConfig, type Config } from "../shared/api";
 import { LangContext, resolveLang, useT } from "../shared/i18n";
 import { Connection } from "./sections/Connection";
@@ -7,6 +7,7 @@ import { Otp } from "./sections/Otp";
 import { General } from "./sections/General";
 import { Icon, type IconName } from "../shared/Icon";
 import { applyTheme } from "../shared/theme";
+import { AutoSave, type SaveStatus } from "../shared/autosave";
 
 type Page = "connection" | "notifications" | "otp" | "general";
 
@@ -20,41 +21,56 @@ const NAV_ICONS: Record<Page, IconName> = {
 export function App() {
   const [page, setPage] = useState<Page>("connection");
   const [config, setConfig] = useState<Config | null>(null);
-  const [dirty, setDirty] = useState(false);
-  const [savedFlash, setSavedFlash] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const configRef = useRef<Config | null>(null);
+  const mounted = useRef(false);
+  const [autosave] = useState(() => new AutoSave<Config>(saveConfig, (status, message) => {
+    if (!mounted.current) return;
+    setSaveStatus(status);
+    setSaveError(message ?? null);
+  }));
+
+  useEffect(() => {
+    mounted.current = true;
+    const flush = () => { void autosave.flush(); };
+    const onVisibility = () => { if (document.hidden) flush(); };
+    window.addEventListener("blur", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      mounted.current = false;
+      window.removeEventListener("blur", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+      flush();
+    };
+  }, [autosave]);
 
   useEffect(() => {
     applyTheme(config?.general.theme);
   }, [config?.general.theme]);
 
   useEffect(() => {
+    let disposed = false;
     getConfig()
-      .then(setConfig)
-      .catch((err) => setError(String(err)));
+      .then((loaded) => {
+        if (disposed) return;
+        configRef.current = loaded;
+        setConfig(loaded);
+      })
+      .catch((err) => { if (!disposed) setError(String(err)); });
+    return () => { disposed = true; };
   }, []);
 
   /** 以「改草稿」的方式更新配置 */
   const update = (mutate: (draft: Config) => void) => {
-    setConfig((prev) => {
-      if (!prev) return prev;
-      const draft = structuredClone(prev);
-      mutate(draft);
-      return draft;
-    });
-    setDirty(true);
-  };
-
-  const save = async () => {
-    if (!config) return;
-    try {
-      await saveConfig(config);
-      setDirty(false);
-      setSavedFlash(true);
-      setTimeout(() => setSavedFlash(false), 2000);
-    } catch (err) {
-      setError(String(err));
-    }
+    if (!configRef.current) return;
+    const draft = structuredClone(configRef.current);
+    mutate(draft);
+    if (JSON.stringify(draft) === JSON.stringify(configRef.current)) return;
+    configRef.current = draft;
+    setConfig(draft);
+    autosave.schedule(draft);
   };
 
   const lang = resolveLang(config?.general.language ?? "auto");
@@ -66,10 +82,10 @@ export function App() {
         setPage={setPage}
         config={config}
         update={update}
-        dirty={dirty}
-        savedFlash={savedFlash}
+        saveStatus={saveStatus}
+        saveError={saveError}
         error={error}
-        save={save}
+        retry={() => { void autosave.flush(); }}
       />
     </LangContext.Provider>
   );
@@ -80,13 +96,13 @@ function Shell(props: {
   setPage: (page: Page) => void;
   config: Config | null;
   update: (mutate: (draft: Config) => void) => void;
-  dirty: boolean;
-  savedFlash: boolean;
+  saveStatus: SaveStatus;
+  saveError: string | null;
   error: string | null;
-  save: () => void;
+  retry: () => void;
 }) {
   const t = useT();
-  const { page, setPage, config, update, dirty, savedFlash, error, save } = props;
+  const { page, setPage, config, update, saveStatus, saveError, error, retry } = props;
 
   const nav: { key: Page; label: string }[] = [
     { key: "connection", label: t.nav.connection },
@@ -115,7 +131,12 @@ function Shell(props: {
             </button>
           ))}
         </nav>
-        <div className="sidebar-caption">{t.shell.tagline}</div>
+        <div className="sidebar-caption">
+          <div className={`autosave-status ${saveStatus === "error" ? "bad-text" : ""}`} role="status">
+            {saveStatus === "idle" ? t.common.autoSave : saveStatus === "saved" ? t.common.saved : saveStatus === "error" ? t.common.saveFailed : t.common.saving}
+          </div>
+          {t.shell.tagline}
+        </div>
       </aside>
 
       <main className="content">
@@ -124,6 +145,10 @@ function Shell(props: {
           <p>{t.shell[page]}</p>
         </header>
         {error && <div className="error-banner">{error}</div>}
+        {saveError && <div className="error-banner" role="alert">
+          <span>{t.common.saveFailed}: {saveError}</span>
+          <button className="btn" onClick={retry}>{t.common.retry}</button>
+        </div>}
 
         {config ? (
           <>
@@ -137,20 +162,6 @@ function Shell(props: {
         )}
       </main>
 
-      {(dirty || savedFlash) && (
-        <footer className="save-bar">
-          {savedFlash ? (
-            <span className="saved-ok">{t.common.saved}</span>
-          ) : (
-            <>
-              <span className="dirty-hint">{t.common.unsaved}</span>
-              <button className="btn primary" onClick={save}>
-                {t.common.save}
-              </button>
-            </>
-          )}
-        </footer>
-      )}
     </div>
   );
 }
