@@ -19,7 +19,7 @@ use windows::Devices::Bluetooth::{
 use windows::Devices::Enumeration::DeviceInformation;
 
 use crate::util::buffer_to_vec;
-use crate::util::{block_on, guid};
+use crate::util::{block_on_timeout, guid};
 use crate::{BleError, Result};
 
 /// 取 ANCS 服务失败后重试几次、每次间隔多久。
@@ -60,22 +60,26 @@ pub fn find_devices(timeout: Duration, stop: &AtomicBool) -> Result<Vec<Discover
             return Err("已要求停止".into());
         }
 
-        let devices =
-            block_on(async { DeviceInformation::FindAllAsyncAqsFilter(&selector)?.await })?;
+        let devices = block_on_timeout(
+            async { DeviceInformation::FindAllAsyncAqsFilter(&selector)?.await },
+            Duration::from_secs(8),
+        )??;
 
         let count = devices.Size()?;
         if count > 0 {
             let mut found = Vec::with_capacity(count as usize);
             for index in 0..count {
                 let info = devices.GetAt(index)?;
-                let device =
-                    match block_on(async { BluetoothLEDevice::FromIdAsync(&info.Id()?)?.await }) {
-                        Ok(device) => device,
-                        Err(error) => {
-                            warn!("打开第 {index} 个 ANCS 候选失败，跳过：{error}");
-                            continue;
-                        }
-                    };
+                let device = match block_on_timeout(
+                    async { BluetoothLEDevice::FromIdAsync(&info.Id()?)?.await },
+                    Duration::from_secs(8),
+                )? {
+                    Ok(device) => device,
+                    Err(error) => {
+                        warn!("打开第 {index} 个 ANCS 候选失败，跳过：{error}");
+                        continue;
+                    }
+                };
                 let id = device_address(&device);
                 let name = device_name(&device);
                 let connected = is_connected(&device);
@@ -141,14 +145,17 @@ pub fn get_ancs_service(device: &BluetoothLEDevice) -> Result<GattDeviceService>
     let mut last_error = String::from("（还没试过）");
 
     for attempt in 1..=SERVICE_ATTEMPTS {
-        let outcome = block_on(async {
-            device
-                .GetGattServicesForUuidWithCacheModeAsync(
-                    guid(ANCS_SERVICE_UUID),
-                    BluetoothCacheMode::Uncached,
-                )?
-                .await
-        });
+        let outcome = block_on_timeout(
+            async {
+                device
+                    .GetGattServicesForUuidWithCacheModeAsync(
+                        guid(ANCS_SERVICE_UUID),
+                        BluetoothCacheMode::Uncached,
+                    )?
+                    .await
+            },
+            Duration::from_secs(8),
+        )?;
 
         match outcome {
             Ok(result) => match result.Status() {
@@ -180,16 +187,20 @@ pub fn get_ancs_service(device: &BluetoothLEDevice) -> Result<GattDeviceService>
 /// 尝试读取标准 BLE Battery Service。任何不支持或读取失败都返回 None，
 /// 绝不影响 ANCS 主链路。
 pub fn try_read_battery_level(device: &BluetoothLEDevice) -> Option<u8> {
-    let services_result = block_on(async {
-        device
-            .GetGattServicesForUuidWithCacheModeAsync(
-                guid(BATTERY_SERVICE_UUID),
-                BluetoothCacheMode::Uncached,
-            )
-            .ok()?
-            .await
-            .ok()
-    })?;
+    let services_result = block_on_timeout(
+        async {
+            device
+                .GetGattServicesForUuidWithCacheModeAsync(
+                    guid(BATTERY_SERVICE_UUID),
+                    BluetoothCacheMode::Uncached,
+                )
+                .ok()?
+                .await
+                .ok()
+        },
+        Duration::from_secs(2),
+    )
+    .ok()??;
     if services_result.Status().ok()? != GattCommunicationStatus::Success {
         return None;
     }
@@ -199,16 +210,20 @@ pub fn try_read_battery_level(device: &BluetoothLEDevice) -> Option<u8> {
     }
     let service = services.GetAt(0).ok()?;
 
-    let characteristics_result = block_on(async {
-        service
-            .GetCharacteristicsForUuidWithCacheModeAsync(
-                guid(BATTERY_LEVEL_UUID),
-                BluetoothCacheMode::Uncached,
-            )
-            .ok()?
-            .await
-            .ok()
-    })?;
+    let characteristics_result = block_on_timeout(
+        async {
+            service
+                .GetCharacteristicsForUuidWithCacheModeAsync(
+                    guid(BATTERY_LEVEL_UUID),
+                    BluetoothCacheMode::Uncached,
+                )
+                .ok()?
+                .await
+                .ok()
+        },
+        Duration::from_secs(2),
+    )
+    .ok()??;
     if characteristics_result.Status().ok()? != GattCommunicationStatus::Success {
         return None;
     }
@@ -217,13 +232,17 @@ pub fn try_read_battery_level(device: &BluetoothLEDevice) -> Option<u8> {
         return None;
     }
     let characteristic = characteristics.GetAt(0).ok()?;
-    let read_result = block_on(async {
-        characteristic
-            .ReadValueWithCacheModeAsync(BluetoothCacheMode::Uncached)
-            .ok()?
-            .await
-            .ok()
-    })?;
+    let read_result = block_on_timeout(
+        async {
+            characteristic
+                .ReadValueWithCacheModeAsync(BluetoothCacheMode::Uncached)
+                .ok()?
+                .await
+                .ok()
+        },
+        Duration::from_secs(2),
+    )
+    .ok()??;
     if read_result.Status().ok()? != GattCommunicationStatus::Success {
         return None;
     }

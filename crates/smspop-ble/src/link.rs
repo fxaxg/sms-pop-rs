@@ -20,7 +20,7 @@ use crate::advertiser;
 use crate::discovery::{self, sleep_unless_stopped, DiscoveredDevice};
 use crate::gatt_server;
 use crate::session::{self, NotificationSink};
-use crate::util::block_on;
+use crate::util::block_on_timeout;
 use crate::{BleError, Result};
 
 /// 链路状态。托盘 tooltip 和状态对话框显示的就是它。
@@ -377,10 +377,20 @@ impl AncsLink {
         while !self.stopped() {
             std::thread::sleep(Duration::from_millis(1000));
 
-            if discovery::is_connected(&device) {
+            // 设备级 ConnectionStatus 可能在 ANCS 的 GATT 会话静默关闭后仍报告 Connected。
+            // 两层都健康才算链路可用，否则主动重建订阅。
+            if discovery::is_connected(&device) && session.is_connected() {
                 misses = 0;
             } else {
                 misses += 1;
+
+                if misses == 1 {
+                    info!(
+                        "链路健康检查未通过：device_connected={} gatt_session_active={}",
+                        discovery::is_connected(&device),
+                        session.is_connected()
+                    );
+                }
 
                 if misses >= 5 {
                     info!("链路断开，准备重连");
@@ -389,8 +399,15 @@ impl AncsLink {
             }
         }
 
-        session.close();
+        // 在可能耗时的清理前撤销就绪状态，避免 UI 在清理期间仍显示正常。
+        if !self.stopped() {
+            self.emit(
+                LinkState::Reconnecting,
+                Some("通知会话失效，正在重建连接".into()),
+            );
+        }
         (self.sink)(LinkEvent::ActiveDevice(None));
+        session.close();
 
         Ok(if self.stopped() {
             RoundEnd::Stopped
@@ -405,7 +422,10 @@ impl AncsLink {
 /// ★ `IsPeripheralRoleSupported` 必须为真：ANCS 要求本机当 BLE 外设。
 ///   很多机器（尤其是老一点的适配器）只支持中心角色，那就是真的走不通。
 fn check_adapter() -> Result<()> {
-    let adapter = block_on(async { BluetoothAdapter::GetDefaultAsync()?.await })?;
+    let adapter = block_on_timeout(
+        async { BluetoothAdapter::GetDefaultAsync()?.await },
+        Duration::from_secs(8),
+    )??;
 
     if !adapter.IsLowEnergySupported()? {
         return Err(BleError::AdapterUnsupported(

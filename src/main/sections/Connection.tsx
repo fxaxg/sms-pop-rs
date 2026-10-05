@@ -67,7 +67,9 @@ export function Connection() {
   const unsupported = link?.state === "adapter_unsupported";
   const ready = link?.ready ?? false;
   const stateLabel = link
-    ? (t.link[link.state as keyof typeof t.link] ?? link.label)
+    ? link.ready
+      ? t.connection.readyTitle
+      : (t.link[link.state as keyof typeof t.link] ?? link.label)
     : "…";
 
   return (

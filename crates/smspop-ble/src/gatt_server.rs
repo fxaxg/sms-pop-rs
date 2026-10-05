@@ -19,7 +19,7 @@ use windows::Devices::Bluetooth::GenericAttributeProfile::{
 };
 use windows::Foundation::TypedEventHandler;
 
-use crate::util::{block_on, guid, to_buffer};
+use crate::util::{block_on_timeout, guid, to_buffer};
 use crate::Result;
 
 /// 我们自己的"存在感"服务，只是为了让本机可连接、并把配对逼出来。
@@ -67,8 +67,10 @@ pub fn is_advertising(host: &GattServerHost) -> bool {
 ///
 /// 返回的 provider **必须一直活着**，否则服务端连同广播一起消失。
 pub fn start() -> Result<GattServerHost> {
-    let result =
-        block_on(async { GattServiceProvider::CreateAsync(guid(PRESENCE_SERVICE))?.await })?;
+    let result = block_on_timeout(
+        async { GattServiceProvider::CreateAsync(guid(PRESENCE_SERVICE))?.await },
+        std::time::Duration::from_secs(8),
+    )??;
     let provider = result.ServiceProvider()?;
 
     let parameters = GattLocalCharacteristicParameters::new()?;
@@ -78,12 +80,15 @@ pub fn start() -> Result<GattServerHost> {
     parameters.SetReadProtectionLevel(GattProtectionLevel::EncryptionRequired)?;
     parameters.SetUserDescription(&HSTRING::from("SmsPop presence"))?;
 
-    let created = block_on(async {
-        provider
-            .Service()?
-            .CreateCharacteristicAsync(guid(PRESENCE_CHARACTERISTIC), &parameters)?
-            .await
-    })?;
+    let created = block_on_timeout(
+        async {
+            provider
+                .Service()?
+                .CreateCharacteristicAsync(guid(PRESENCE_CHARACTERISTIC), &parameters)?
+                .await
+        },
+        std::time::Duration::from_secs(8),
+    )??;
 
     let characteristic = created
         .Characteristic()
@@ -99,13 +104,17 @@ pub fn start() -> Result<GattServerHost> {
                 };
 
                 let deferral = args.GetDeferral()?;
-                let outcome = block_on(async { args.GetRequestAsync()?.await });
-                match outcome {
-                    Ok(request) => {
-                        info!("GATT 服务端：iPhone 读取了受保护特征，配对链路已触发");
-                        request.RespondWithValue(&to_buffer(b"SmsPop")?)?;
-                    }
-                    Err(error) => warn!("GATT 服务端：取得读取请求失败：{error}"),
+                let outcome = (|| -> crate::Result<()> {
+                    let request = block_on_timeout(
+                        async { args.GetRequestAsync()?.await },
+                        std::time::Duration::from_secs(5),
+                    )??;
+                    info!("GATT 服务端：iPhone 读取了受保护特征，配对链路已触发");
+                    request.RespondWithValue(&to_buffer(b"SmsPop")?)?;
+                    Ok(())
+                })();
+                if let Err(error) = outcome {
+                    warn!("GATT 服务端：读取请求失败：{error}");
                 }
                 deferral.Complete()?;
                 Ok(())
