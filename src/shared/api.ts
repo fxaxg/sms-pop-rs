@@ -35,6 +35,7 @@ export interface CaretOptions {
 }
 
 export type InsertMode = "direct" | "simulate";
+export type ThemeSetting = "auto" | "light" | "dark";
 
 export interface InsertionOptions {
   mode: InsertMode;
@@ -53,11 +54,14 @@ export interface Config {
   otp: OtpOptions;
   general: {
     language: string; // "auto" | "zh" | "en"
+    theme: ThemeSetting;
   };
 }
 
 export const getConfig = () => invoke<Config>("get_config");
 export const saveConfig = (config: Config) => invoke<void>("save_config", { config });
+export const onThemeChanged = (handler: (theme: ThemeSetting) => void) =>
+  listen<ThemeSetting>("theme-changed", (event) => handler(event.payload));
 
 // ── 元信息 ────────────────────────────────────────────────────
 

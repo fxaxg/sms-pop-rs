@@ -13,7 +13,8 @@ import {
   type ManagedDevice,
 } from "../../shared/api";
 import { useT } from "../../shared/i18n";
-import { Section, Row } from "../components";
+import { Section } from "../components";
+import { Icon } from "../../shared/Icon";
 
 /** 「连接」页：链路状态 + 新手引导。 */
 export function Connection() {
@@ -21,6 +22,7 @@ export function Connection() {
   const [link, setLink] = useState<LinkStatePayload | null>(null);
   const [devices, setDevices] = useState<ManagedDevice[]>([]);
   const [deviceError, setDeviceError] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
   // 测试通知倒计时：点了之后 Rust 会延迟 4 秒发出，按钮同步倒数
   const [countdown, setCountdown] = useState<number | null>(null);
 
@@ -65,6 +67,7 @@ export function Connection() {
   };
 
   const unsupported = link?.state === "adapter_unsupported";
+  const failed = unsupported || link?.state === "faulted";
   const ready = link?.ready ?? false;
   const stateLabel = link
     ? link.ready
@@ -74,28 +77,39 @@ export function Connection() {
 
   return (
     <>
-      <Section title={t.connection.statusTitle}>
-        <div className={`status-card ${ready ? "ok" : ""} ${unsupported ? "bad" : ""}`}>
+      <div className={`status-card ${ready ? "ok" : ""} ${failed ? "bad" : ""}`} role="status">
           <span className="status-dot" />
           <div>
             <strong>{stateLabel}</strong>
-            {link?.detail && <p className="status-detail">{link.detail}</p>}
+            <p className="status-detail">{failed && link?.detail ? link.detail : ready ? t.connection.readyHint : link?.awaiting_verification ? t.connection.verificationHint : t.connection.waitingHint}</p>
           </div>
-        </div>
-      </Section>
+      </div>
 
+      <div className="connection-toolbar">
+        <button className="btn" aria-expanded={showGuide} onClick={() => setShowGuide(!showGuide)}>
+          <Icon name="plus" size={15} />{showGuide ? t.connection.closeGuide : t.connection.addDevice}
+        </button>
+      </div>
       <Section title={t.connection.devicesTitle} description={t.connection.devicesDesc}>
         {deviceError && <p className="bad-text">{deviceError}</p>}
         {devices.length === 0 ? (
-          <p className="connection-help">{t.connection.devicesEmpty}</p>
+          <div className="empty-device">
+            <span className="device-symbol"><Icon name="phone" size={28} /></span>
+            <strong>{t.connection.emptyTitle}</strong>
+            <p>{t.connection.emptyDesc}</p>
+            <button className="btn primary" onClick={() => openBluetoothSettings()}>{t.connection.openBluetooth}</button>
+          </div>
         ) : (
           <div className="device-list">
             {devices.map((device) => (
               <article className={`device-card ${device.current ? "current" : ""}`} key={device.id}>
                 <div className="device-main">
-                  <div>
-                    <strong>{device.name}</strong>
-                    <span className="device-id">{device.address_hint}</span>
+                   <div className="device-identity">
+                     <span className="device-symbol"><Icon name="phone" size={24} /></span>
+                     <div>
+                     <strong>{device.name}</strong>
+                     <span className="device-id">{device.address_hint}</span>
+                     </div>
                   </div>
                   <div className="device-badges">
                     {device.preferred && <span className="device-badge preferred">{t.connection.preferred}</span>}
@@ -106,13 +120,14 @@ export function Connection() {
                 <p className="device-state">
                   {device.current
                     ? device.connected
-                      ? t.connection.deviceConnected
+                       ? ready ? t.connection.deviceConnected : t.connection.verificationHint
                       : t.connection.deviceConnecting
                     : device.online
                       ? t.connection.deviceOnline
                       : t.connection.deviceOffline}
                   {device.battery_level !== null && ` · ${t.connection.battery(device.battery_level)}`}
                 </p>
+                {device.last_connected_at !== null && <p className="device-last-seen">{t.connection.lastConnected} · {new Date(device.last_connected_at).toLocaleString()}</p>}
                 <div className="device-actions">
                   {!device.preferred && (
                     <button className="btn" onClick={() => runDeviceAction(() => setPreferredDevice(device.id))}>
@@ -143,9 +158,9 @@ export function Connection() {
         )}
       </Section>
 
-      <Section title={t.connection.guideTitle} description={t.connection.guideDesc}>
+      {(showGuide || devices.length === 0) && <Section title={t.connection.guideTitle} description={t.connection.guideDesc}>
         <ol className="guide">
-          <li className={unsupported ? "bad" : "done"}>
+          <li className={unsupported ? "bad" : ""}>
             <strong>{t.connection.step1}</strong>
             {unsupported ? (
               <p className="bad-text">{t.connection.step1Bad}</p>
@@ -158,35 +173,28 @@ export function Connection() {
               </button>
             </div>
           </li>
-          <li className={ready || (link && link.state !== "stopped") ? "done" : ""}>
+          <li>
             <strong>{t.connection.step2}</strong>
             <p>{t.connection.step2Desc}</p>
           </li>
           <li className={ready ? "done" : ""}>
             <strong>{t.connection.step3}</strong>
             <p>{t.connection.step3Desc}</p>
-            <div className="row-control">
-              <button
-                className="btn primary"
-                onClick={onSendTest}
-                disabled={countdown !== null}
-              >
-                {countdown === null
-                  ? t.connection.sendTest
-                  : countdown > 0
-                    ? t.connection.sending(countdown)
-                    : t.connection.sent}
-              </button>
-            </div>
           </li>
         </ol>
-      </Section>
+      </Section>}
 
-      <Section title={t.connection.tipsTitle}>
-        <Row label={t.connection.tipsLabel}>
-          <span className="hint-text">{t.connection.tipsBody}</span>
-        </Row>
+      <Section title={t.connection.diagnostics}>
+        <p className="connection-help">{t.connection.tipsBody}</p>
+        <div className="help-actions"><button className="btn" onClick={() => openBluetoothSettings()}>{t.connection.openBluetooth}</button></div>
+        {link?.detail && <details className="diagnostic-details"><summary>{t.connection.details}</summary><p className="status-detail">{link.detail}</p></details>}
       </Section>
+      <div className="local-test">
+        <div><strong>{t.connection.testTitle}</strong><p>{t.connection.testDesc}</p></div>
+        <button className="btn" onClick={onSendTest} disabled={countdown !== null}>
+          {countdown === null ? t.connection.sendTest : countdown > 0 ? t.connection.sending(countdown) : t.connection.sent}
+        </button>
+      </div>
     </>
   );
 }

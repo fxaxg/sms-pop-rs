@@ -5,14 +5,16 @@ import { Connection } from "./sections/Connection";
 import { Notifications } from "./sections/Notifications";
 import { Otp } from "./sections/Otp";
 import { General } from "./sections/General";
+import { Icon, type IconName } from "../shared/Icon";
+import { applyTheme } from "../shared/theme";
 
 type Page = "connection" | "notifications" | "otp" | "general";
 
-const NAV_ICONS: Record<Page, string> = {
-  connection: "📱",
-  notifications: "🔔",
-  otp: "🔢",
-  general: "⚙️",
+const NAV_ICONS: Record<Page, IconName> = {
+  connection: "phone",
+  notifications: "bell",
+  otp: "code",
+  general: "settings",
 };
 
 export function App() {
@@ -21,6 +23,10 @@ export function App() {
   const [dirty, setDirty] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    applyTheme(config?.general.theme);
+  }, [config?.general.theme]);
 
   useEffect(() => {
     getConfig()
@@ -93,30 +99,30 @@ function Shell(props: {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand">
-          <svg className="brand-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden>
-            <rect x="2" y="4" width="20" height="15" rx="5" fill="var(--accent)" />
-            <path d="M8 19 L6 23 L12 19 Z" fill="var(--accent)" />
-            <circle cx="8" cy="11.5" r="1.6" fill="#fff" />
-            <circle cx="12" cy="11.5" r="1.6" fill="#fff" />
-            <circle cx="16" cy="11.5" r="1.6" fill="#fff" />
-          </svg>
+          <span className="brand-icon"><Icon name="message" size={22} /></span>
           <span className="brand-name">SmsPop</span>
         </div>
-        <nav>
+        <nav aria-label={t.shell.navigation}>
           {nav.map((item) => (
             <button
               key={item.key}
               className={`nav-item ${page === item.key ? "active" : ""}`}
               onClick={() => setPage(item.key)}
+              aria-current={page === item.key ? "page" : undefined}
             >
-              <span className="nav-icon">{NAV_ICONS[item.key]}</span>
+              <Icon name={NAV_ICONS[item.key]} />
               {item.label}
             </button>
           ))}
         </nav>
+        <div className="sidebar-caption">{t.shell.tagline}</div>
       </aside>
 
       <main className="content">
+        <header className="page-header">
+          <h1>{t.nav[page]}</h1>
+          <p>{t.shell[page]}</p>
+        </header>
         {error && <div className="error-banner">{error}</div>}
 
         {config ? (

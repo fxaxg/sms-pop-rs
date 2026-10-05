@@ -1,45 +1,79 @@
 /* SmsPop 设计令牌 —— 所有窗口共用 */
 
 :root {
-  --accent: #4f6ef7;
-  --accent-strong: #3b5bec;
-  --accent-soft: rgba(79, 110, 247, 0.12);
+  --accent: #292929;
+  --accent-strong: #111111;
+  --accent-soft: #eeeeee;
+  --on-accent: #ffffff;
+  --focus: #245e91;
+  --sidebar: #f3f3f3;
 
-  --bg: #f6f7f9;
+  --bg: #fafafa;
   --surface: #ffffff;
-  --surface-hover: #f0f1f5;
-  --border: #e4e6ec;
+  --surface-hover: #f0f0f0;
+  --border: #e5e5e5;
 
-  --text: #1d2129;
-  --text-secondary: #6b7280;
-  --text-faint: #9ca3af;
+  --text: #202020;
+  --text-secondary: #666666;
+  --text-faint: #767676;
 
-  --success: #22b07d;
-  --warning: #e8a13a;
-  --danger: #e5534b;
+  --success: #28734b;
+  --warning: #926418;
+  --danger: #b43b35;
 
-  --radius: 10px;
-  --radius-lg: 14px;
+  --radius: 6px;
+  --radius-lg: 8px;
 
-  --shadow: 0 8px 28px rgba(20, 24, 40, 0.14);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 
-  font-family: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-family: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei", sans-serif;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #16171b;
-    --surface: #1f2126;
-    --surface-hover: #26292f;
-    --border: #33363e;
+  :root:not([data-theme="light"]) {
+    --bg: #191919;
+    --sidebar: #202020;
+    --surface: #232323;
+    --surface-hover: #2e2e2e;
+    --border: #383838;
 
-    --text: #e8eaf0;
-    --text-secondary: #9aa0ab;
-    --text-faint: #6b7280;
+    --text: #eeeeee;
+    --text-secondary: #b3b3b3;
+    --text-faint: #a0a0a0;
 
-    --accent-soft: rgba(79, 110, 247, 0.22);
-    --shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+    --accent: #dedede;
+    --accent-strong: #ffffff;
+    --accent-soft: #303030;
+    --on-accent: #202020;
+    --focus: #8ab8df;
+    --success: #80bc97;
+    --warning: #dbb36b;
+    --danger: #ef918a;
+    --shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #191919;
+  --sidebar: #202020;
+  --surface: #232323;
+  --surface-hover: #2e2e2e;
+  --border: #383838;
+  --text: #eeeeee;
+  --text-secondary: #b3b3b3;
+  --text-faint: #a0a0a0;
+  --accent: #dedede;
+  --accent-strong: #ffffff;
+  --accent-soft: #303030;
+  --on-accent: #202020;
+  --focus: #8ab8df;
+  --success: #80bc97;
+  --warning: #dbb36b;
+  --danger: #ef918a;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  color-scheme: dark;
 }
 
 * {
@@ -61,4 +95,20 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   user-select: none;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -6,6 +6,7 @@ import {
   setAutostart,
   type Config,
   type SettingsMeta,
+  type ThemeSetting,
 } from "../../shared/api";
 import { useT } from "../../shared/i18n";
 import { Row, Section, Toggle } from "../components";
@@ -26,6 +27,19 @@ export function General({ config, update }: Props) {
 
   return (
     <>
+      <Section title={t.general.appearanceTitle}>
+        <Row label={t.general.theme} hint={t.general.themeHint}>
+          <select className="select" aria-label={t.general.theme}
+            value={config.general.theme}
+            onChange={(event) => update((draft) => {
+              draft.general.theme = event.target.value as ThemeSetting;
+            })}>
+            <option value="auto">{t.general.langAuto}</option>
+            <option value="light">{t.general.themeLight}</option>
+            <option value="dark">{t.general.themeDark}</option>
+          </select>
+        </Row>
+      </Section>
       <Section title={t.general.startupTitle}>
         <Row label={t.general.autostart} hint={t.general.autostartHint}>
           <Toggle

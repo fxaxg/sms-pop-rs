@@ -17,10 +17,10 @@ body {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  border: none;
-  border-radius: 999px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -47,17 +47,19 @@ body {
 .pill-code {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
-  background: rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, var(--on-accent) 12%, transparent);
   padding: 1px 7px;
   border-radius: 6px;
 }
 
 .pill.done {
-  background: var(--success);
+  background: var(--surface);
+  color: var(--success);
 }
 
 .pill.failed {
-  background: var(--danger);
+  background: var(--surface);
+  color: var(--danger);
 }
 
 .pill:disabled {
