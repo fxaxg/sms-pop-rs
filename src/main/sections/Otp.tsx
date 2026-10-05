@@ -1,6 +1,6 @@
 import type { Config, InsertMode } from "../../shared/api";
 import { useT } from "../../shared/i18n";
-import { NumberField, Row, Section, Toggle } from "../components";
+import { Disclosure, NumberField, Row, Section, Toggle } from "../components";
 
 interface Props {
   config: Config;
@@ -14,28 +14,29 @@ export function Otp({ config, update }: Props) {
 
   return (
     <>
-      <Section title={t.otp.title} description={t.otp.desc}>
-        <Row label={t.otp.enabled}>
+      <Section title={t.ui.detect} action={
           <Toggle
             checked={otp.enabled}
             onChange={(value) => update((d) => void (d.otp.enabled = value))}
           />
-        </Row>
-        <Row label={t.otp.autoCopy} hint={t.otp.autoCopyHint}>
+        }>
+        <Row label={t.otp.autoCopy} hint={t.ui.copyHint}>
           <Toggle
             checked={otp.auto_copy}
+            disabled={!otp.enabled}
             onChange={(value) => update((d) => void (d.otp.auto_copy = value))}
           />
         </Row>
       </Section>
 
-      <Section title={t.otp.caretTitle} description={t.otp.caretDesc}>
-        <Row label={t.otp.caretEnabled}>
+      <Section title={t.otp.caretTitle} description={t.ui.caretHint} action={
           <Toggle
             checked={otp.caret.enabled}
+            disabled={!otp.enabled}
             onChange={(value) => update((d) => void (d.otp.caret.enabled = value))}
           />
-        </Row>
+        }>
+        <fieldset className="settings-fields" disabled={!otp.enabled || !otp.caret.enabled}>
         <Row label={t.otp.caretDuration}>
           <NumberField
             value={otp.caret.duration_seconds}
@@ -45,6 +46,10 @@ export function Otp({ config, update }: Props) {
             onChange={(value) => update((d) => void (d.otp.caret.duration_seconds = value))}
           />
         </Row>
+        </fieldset>
+      </Section>
+      <Disclosure title={t.ui.advanced}>
+        <fieldset className="settings-fields" disabled={!otp.enabled || !otp.caret.enabled}>
         <Row label={t.otp.watchSeconds} hint={t.otp.watchSecondsHint}>
           <NumberField
             value={otp.caret.watch_seconds}
@@ -63,9 +68,6 @@ export function Otp({ config, update }: Props) {
             onChange={(value) => update((d) => void (d.otp.caret.gap = value))}
           />
         </Row>
-      </Section>
-
-      <Section title={t.otp.insertionTitle} description={t.otp.insertionDesc}>
         <Row label={t.otp.mode} hint={t.otp.modeHint}>
           <select
             className="select"
@@ -89,7 +91,8 @@ export function Otp({ config, update }: Props) {
             />
           </Row>
         )}
-      </Section>
+        </fieldset>
+      </Disclosure>
     </>
   );
 }

@@ -1,6 +1,7 @@
-import type { Config } from "../../shared/api";
+import { useEffect, useState } from "react";
+import { sendTestNotification, type Config } from "../../shared/api";
 import { useT } from "../../shared/i18n";
-import { NumberField, Row, Section, TextList, Toggle } from "../components";
+import { Disclosure, NumberField, Row, Section, TextList, Toggle } from "../components";
 import { AppRules } from "./AppRules";
 
 interface Props {
@@ -12,16 +13,23 @@ interface Props {
 export function Notifications({ config, update }: Props) {
   const t = useT();
   const notifications = config.notifications;
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (countdown === null) return;
+    const timer = setTimeout(() => setCountdown(countdown === 0 ? null : countdown - 1), countdown === 0 ? 1500 : 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
+  const filterCount = Object.values(notifications.filter).reduce((total, entries) => total + entries.length, 0);
 
   return (
     <>
-      <Section title={t.notifications.title} description={t.notifications.desc}>
-        <Row label={t.notifications.enabled}>
+      <Section title={t.ui.popups} description={t.ui.popupHint} action={
           <Toggle
             checked={notifications.enabled}
             onChange={(value) => update((d) => void (d.notifications.enabled = value))}
           />
-        </Row>
+        }>
         <Row label={t.notifications.duration} hint={t.notifications.durationHint}>
           <NumberField
             value={notifications.popup.duration_seconds}
@@ -43,10 +51,16 @@ export function Notifications({ config, update }: Props) {
             }
           />
         </Row>
+      <div className="local-test">
+        <div><strong>{t.connection.testTitle}</strong><p>{t.connection.testDesc}</p>{error && <p className="bad-text" role="alert">{error}</p>}</div>
+        <button className="btn" disabled={countdown !== null} onClick={async () => { setError(null); setCountdown(4); try { await sendTestNotification(); } catch (err) { setError(String(err)); setCountdown(null); } }}>{countdown === null ? t.connection.sendTest : countdown > 0 ? t.connection.sending(countdown) : t.connection.sent}</button>
+      </div>
       </Section>
 
       <AppRules config={config} update={update} />
-      <Section title={t.notifications.filterTitle} description={t.notifications.filterDesc}>
+      <Disclosure title={t.notifications.filterTitle} hint={filterCount ? t.ui.configured(filterCount) : t.ui.unset}>
+        <p className="connection-help">{t.ui.filterNote}</p>
+        <p className="connection-help">{t.notifications.filterDesc}</p>
         <Row label={t.notifications.excludeApps} hint={t.notifications.excludeAppsHint}>
           <TextList
             value={notifications.filter.exclude_apps}
@@ -78,7 +92,7 @@ export function Notifications({ config, update }: Props) {
             }
           />
         </Row>
-      </Section>
+      </Disclosure>
     </>
   );
 }

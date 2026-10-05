@@ -101,8 +101,17 @@
 }
 
 .section {
-  margin-bottom: 28px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
+
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.section-head > div:first-child { min-width: 0; }
+.section-action { flex-shrink: 0; }
+.section-action .toggle { display: block; }
 
 .section-head h2 {
   margin: 0;
@@ -122,6 +131,10 @@
   flex-direction: column;
 }
 
+.section-head + .section-body { border-top: 1px solid var(--border); padding-top: 6px; }
+.section-body:empty { display: none; }
+.section > .section-body:first-child { margin-top: 0; }
+
 .row {
   display: flex;
   align-items: flex-start;
@@ -131,7 +144,7 @@
 }
 
 .row + .row {
-  border-top: 1px solid var(--border);
+  border-top: none;
 }
 
 .row-label {
@@ -460,6 +473,39 @@
 .rule-editor { margin-top: 14px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; gap: 12px; }
 .rule-editor label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
 .rule-editor input, .rule-editor select { padding: 7px 9px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); width: 100%; }
+
+.modal { width: min(520px, calc(100vw - 48px)); max-height: calc(100vh - 80px); padding: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.modal::backdrop { background: rgba(0,0,0,.38); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.modal-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.modal-close { border: 0; font-size: 20px; min-width: 32px; padding: 0; }
+.modal-body { padding: 20px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+.modal .rule-editor { padding: 0; border: 0; margin: 0; }
+.wizard-progress { list-style: none; display: flex; gap: 12px; padding: 0; margin: 0 0 24px; }
+.wizard-progress li { display: grid; place-items: center; border-radius: 50%; width: 28px; height: 28px; background: var(--surface-hover); color: var(--text-secondary); font-size: 12px; }
+.wizard-progress li.active { background: var(--accent); color: var(--on-accent); }
+.modal h3 { font-size: 16px; margin: 0 0 12px; }
+.wizard-description, .wizard-note { font-size: 13px; color: var(--text-secondary); }
+.wizard-note { background: var(--surface-hover); border-radius: 6px; padding: 12px; }
+.disclosure { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin: 16px 0; padding: 0 20px; }
+.disclosure summary { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 17px 0; font-size: 14px; font-weight: 600; list-style: none; }
+.disclosure summary::before { content: '›'; font-size: 18px; font-weight: 400; }
+.disclosure[open] summary::before { transform: rotate(90deg); }
+.disclosure summary small { margin-left: auto; color: var(--text-secondary); font-weight: 400; font-size: 11px; }
+.disclosure-body { padding: 0 0 14px; }
+.disclosure[open] > summary { border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.modal .disclosure { padding: 0 12px; background: var(--bg); }
+.settings-fields { margin: 0; padding: 0; border: 0; min-width: 0; }
+.settings-fields:disabled, .toggle:disabled { opacity: .5; }
+.toggle:disabled { cursor: default; }
+.local-test { margin: 8px 0 0; padding-top: 16px; gap: 16px; }
+.local-test strong { font-weight: 400; }
+.device-card { border: 0; border-radius: 0; padding: 12px 0; background: transparent; }
+.device-card + .device-card { border-top: 1px solid var(--border); }
+.empty-device { border: 0; background: transparent; padding: 16px 0 4px; }
+.status-card { border: 0; padding: 0 0 20px; border-radius: 0; }
+.app-rule:last-child { border-bottom: 0; padding-bottom: 0; }
 
 .connection-toolbar { display: flex; justify-content: flex-end; margin: 18px 0 14px; }
 .device-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
