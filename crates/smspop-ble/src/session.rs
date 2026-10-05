@@ -10,7 +10,7 @@
 //! * Data Source 的长度是**字节**，而且**可能分片** —— 累积到收满 tuple 才算完整
 //! * 同一时刻**只能有一个 Control Point 请求在飞**，所以写入必须串行
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
@@ -19,11 +19,13 @@ use std::time::Duration;
 use log::{debug, info, warn};
 use smspop_core::ancs::{self, ParseStatus};
 use smspop_core::model::PhoneNotification;
+use windows::core::IInspectable;
+use windows::Devices::Bluetooth::BluetoothConnectionStatus;
 use windows::Devices::Bluetooth::BluetoothLEDevice;
 use windows::Devices::Bluetooth::GenericAttributeProfile::{
     GattCharacteristic, GattClientCharacteristicConfigurationDescriptorValue,
     GattCommunicationStatus, GattDeviceService, GattSession, GattSessionStatus,
-    GattValueChangedEventArgs, GattWriteOption,
+    GattSessionStatusChangedEventArgs, GattValueChangedEventArgs, GattWriteOption,
 };
 use windows::Foundation::TypedEventHandler;
 
@@ -56,10 +58,89 @@ struct Shared {
     response_ready: Condvar,
     stopping: AtomicBool,
     failed: AtomicBool,
+    events: AtomicU64,
+}
+
+/// Sticky invalidation: a brief disconnect must not disappear between polls.
+struct ConnectionWatch {
+    device: BluetoothLEDevice,
+    connection_token: i64,
+    services_token: i64,
+    session: Option<(GattSession, i64)>,
+}
+
+impl ConnectionWatch {
+    fn new(
+        device: &BluetoothLEDevice,
+        session: Option<&GattSession>,
+        state: &Arc<Shared>,
+    ) -> Result<Self> {
+        let shared = Arc::clone(state);
+        let connection_token =
+            device.ConnectionStatusChanged(
+                &TypedEventHandler::<BluetoothLEDevice, IInspectable>::new(move |sender, _| {
+                    if sender.as_ref().is_none_or(|device| {
+                        device.ConnectionStatus() != Ok(BluetoothConnectionStatus::Connected)
+                    }) {
+                        info!("设备断开事件：作废旧 ANCS 订阅");
+                        shared.failed.store(true, Ordering::Relaxed);
+                    }
+                    Ok(())
+                }),
+            )?;
+        let mut watch = Self {
+            device: device.clone(),
+            connection_token,
+            services_token: 0,
+            session: None,
+        };
+        let shared = Arc::clone(state);
+        watch.services_token = device.GattServicesChanged(&TypedEventHandler::<
+            BluetoothLEDevice,
+            IInspectable,
+        >::new(move |_, _| {
+            info!("GATT 服务变化：要求重新发现和订阅 ANCS");
+            shared.failed.store(true, Ordering::Relaxed);
+            Ok(())
+        }))?;
+        if let Some(session) = session {
+            let shared = Arc::clone(state);
+            let token = session.SessionStatusChanged(&TypedEventHandler::<
+                GattSession,
+                GattSessionStatusChangedEventArgs,
+            >::new(move |_, args| {
+                if args
+                    .as_ref()
+                    .is_none_or(|args| args.Status() != Ok(GattSessionStatus::Active))
+                {
+                    info!("GATT 会话关闭事件：作废旧 ANCS 订阅");
+                    shared.failed.store(true, Ordering::Relaxed);
+                }
+                Ok(())
+            }))?;
+            watch.session = Some((session.clone(), token));
+        }
+        Ok(watch)
+    }
+}
+
+impl Drop for ConnectionWatch {
+    fn drop(&mut self) {
+        let _ = self
+            .device
+            .RemoveConnectionStatusChanged(self.connection_token);
+        if self.services_token != 0 {
+            let _ = self.device.RemoveGattServicesChanged(self.services_token);
+        }
+        if let Some((session, token)) = &self.session {
+            let _ = session.RemoveSessionStatusChanged(*token);
+        }
+    }
 }
 
 /// 一个活着的 ANCS 会话。drop 或 [`AncsSession::close`] 会退订并停掉写入线程。
 pub struct AncsSession {
+    connection_watch: Option<ConnectionWatch>,
     shared: Arc<Shared>,
     closed: bool,
     service: GattDeviceService,
@@ -209,6 +290,7 @@ impl AncsSession {
 
         // 闭包要把 sender 拿走一份，struct 里还要留一份用来在关闭时断开
         let ns_writer_tx = writer_tx.clone();
+        let ns_shared = Arc::clone(&shared);
 
         let ns_handler = TypedEventHandler::<GattCharacteristic, GattValueChangedEventArgs>::new(
             move |_sender, args| {
@@ -217,6 +299,7 @@ impl AncsSession {
                 };
 
                 let bytes = buffer_to_vec(&args.CharacteristicValue()?)?;
+                ns_shared.events.fetch_add(1, Ordering::Relaxed);
 
                 let Some(event) = ancs::parse_notification_source(&bytes) else {
                     warn!("Notification Source 载荷长度异常：{}", bytes.len());
@@ -262,6 +345,7 @@ impl AncsSession {
         // ------------------------------------------------------------------
         // 先构造资源所有者，后续订阅/起线程失败会自动走 Drop 回滚。
         let mut session = Self {
+            connection_watch: None,
             shared: Arc::clone(&shared),
             closed: false,
             service,
@@ -275,6 +359,11 @@ impl AncsSession {
             writer_tx: Some(writer_tx),
             writer: None,
         };
+        session.connection_watch = Some(ConnectionWatch::new(
+            device,
+            session.gatt_session.as_ref(),
+            &shared,
+        )?);
         let ds_status = subscribe(&session.data_source)?;
         let ns_status = subscribe(&session.notification_source)?;
 
@@ -310,9 +399,27 @@ impl AncsSession {
     pub fn is_connected(&self) -> bool {
         !self.shared.failed.load(Ordering::Relaxed)
             && self
+                .writer
+                .as_ref()
+                .is_none_or(|writer| !writer.is_finished())
+            && self
                 .gatt_session
                 .as_ref()
                 .is_none_or(|session| session.SessionStatus() == Ok(GattSessionStatus::Active))
+    }
+
+    pub fn event_count(&self) -> u64 {
+        self.shared.events.load(Ordering::Relaxed)
+    }
+
+    /// Reassert CCCDs without disconnecting a quiet, otherwise healthy phone.
+    pub fn refresh_subscriptions(&self) -> Result<()> {
+        for characteristic in [&self.data_source, &self.notification_source] {
+            if subscribe(characteristic)? != GattCommunicationStatus::Success {
+                return Err("刷新 ANCS 订阅失败".into());
+            }
+        }
+        Ok(())
     }
 
     /// 主动退订并停掉写入线程。
@@ -325,6 +432,7 @@ impl AncsSession {
             return;
         }
         self.closed = true;
+        self.connection_watch.take();
         info!("开始关闭 ANCS 会话");
         {
             let _pending = self.shared.pending_uid.lock().unwrap();
@@ -365,7 +473,7 @@ impl AncsSession {
             }
         }
 
-        let _ = &self.service;
+        let _ = self.service.Close();
         info!("ANCS 会话已关闭");
     }
 }
@@ -433,6 +541,19 @@ fn control_point_writer(
     control_point: GattCharacteristic,
     state: Arc<Shared>,
 ) {
+    use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
+    if let Err(error) = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.ok() {
+        warn!("Control Point 线程 COM 初始化失败：{error}");
+        state.failed.store(true, Ordering::Relaxed);
+        return;
+    }
+    struct ComGuard;
+    impl Drop for ComGuard {
+        fn drop(&mut self) {
+            unsafe { CoUninitialize() };
+        }
+    }
+    let _com = ComGuard;
     while let Ok(command) = command_rx.recv() {
         if state.stopping.load(Ordering::Relaxed) {
             break;
@@ -543,6 +664,15 @@ fn control_point_writer(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn 断开标记不会被连接恢复或新通知清除() {
+        let shared = Shared::default();
+        shared.failed.store(true, Ordering::Relaxed);
+        shared.events.fetch_add(1, Ordering::Relaxed);
+        assert!(shared.failed.load(Ordering::Relaxed));
+        assert!(!Shared::default().failed.load(Ordering::Relaxed));
+    }
 
     #[test]
     fn 停止消息不依赖回调发送端释放() {

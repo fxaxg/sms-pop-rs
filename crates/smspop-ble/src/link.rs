@@ -373,9 +373,31 @@ impl AncsLink {
         // ★ 同样不能只看 `ConnectionStatus`（见上）：容忍几秒抖动，
         //   连续多次都报未连接才认定为真断。
         let mut misses = 0u32;
+        let mut last_events = session.event_count();
+        let mut last_activity = std::time::Instant::now();
+        let mut last_health_log = std::time::Instant::now();
 
         while !self.stopped() {
             std::thread::sleep(Duration::from_millis(1000));
+            let events = session.event_count();
+            if events != last_events {
+                last_events = events;
+                last_activity = std::time::Instant::now();
+            }
+            // Idle is not proof of failure. Reassert CCCDs without tearing down
+            // a healthy connection; rebuild only if the operation fails.
+            if last_activity.elapsed() >= Duration::from_secs(120) {
+                info!("ANCS 静默两分钟，检查并刷新通知订阅");
+                if let Err(error) = session.refresh_subscriptions() {
+                    warn!("刷新订阅失败，重建会话：{error}");
+                    break;
+                }
+                last_activity = std::time::Instant::now();
+            }
+            if last_health_log.elapsed() >= Duration::from_secs(60) {
+                info!("链路监督仍运行：device_connected={} session_healthy={} notification_events={events}", discovery::is_connected(&device), session.is_connected());
+                last_health_log = std::time::Instant::now();
+            }
 
             // 设备级 ConnectionStatus 可能在 ANCS 的 GATT 会话静默关闭后仍报告 Connected。
             // 两层都健康才算链路可用，否则主动重建订阅。
