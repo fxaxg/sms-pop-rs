@@ -1,0 +1,30 @@
+name: 问题反馈
+description: 报告可复现的问题，请勿公开敏感数据。
+body:
+  - type: markdown
+    attributes:
+      value: 请先脱敏。不要上传包含通知正文、验证码、联系人或个人信息的原始日志。
+  - type: input
+    id: version
+    attributes:
+      label: SmsPop 版本或提交
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: Windows、iOS 版本，蓝牙适配器型号，以及是否从源码运行。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤、预期和实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 脱敏证据
+      description: 可提供时间点、状态、错误码或脱敏截图；明确哪些情况未验证。
