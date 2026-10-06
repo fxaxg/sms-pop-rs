@@ -121,6 +121,27 @@ fn open_in_explorer(path: &std::path::Path) -> Result<(), String> {
     Ok(())
 }
 
+/// 仅允许设置窗口打开固定项目链接，不接受前端传入任意 URL 或命令。
+#[tauri::command]
+pub fn open_project_link(window: tauri::WebviewWindow, target: String) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("Project links are only available in settings".into());
+    }
+    let url = match target.as_str() {
+        "repository" => "https://github.com/fxaxg/sms-pop-rs",
+        "contributors" => "https://github.com/fxaxg/sms-pop-rs/graphs/contributors",
+        "issues" => "https://github.com/fxaxg/sms-pop-rs/issues",
+        "author" => "https://github.com/fxaxg",
+        _ => return Err("Unknown project link".into()),
+    };
+    crate::app_launcher::open(&smspop_core::app_rules::AppRule {
+        app_id: "smspop.about".into(),
+        name: "SmsPop project".into(),
+        enabled: true,
+        target: url.into(),
+    })
+}
+
 // ── 链路 ──────────────────────────────────────────────────────
 
 #[tauri::command]
