@@ -540,3 +540,46 @@
 .update-panel { margin: 0 0 16px; }
 .update-panel progress { width: 100%; }
 .update-notes { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; font-size: 13px; }
+.about-page { max-width: 780px; margin: 0 auto; }
+.content:has(.about-page) { padding-bottom: 28px; }
+.content:has(.about-page) .page-header { margin-bottom: 20px; }
+.about-hero { padding: 22px 26px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); margin-bottom: 12px; }
+.about-identity { display: flex; align-items: center; gap: 18px; }
+.about-app-icon { width: 76px; height: 76px; flex-shrink: 0; filter: drop-shadow(0 6px 10px rgba(0,0,0,.08)); }
+.about-eyebrow { font-size: 10px; letter-spacing: 2px; color: var(--text-secondary); font-weight: 600; }
+.about-identity h2 { margin: 2px 0 4px; font-size: 30px; letter-spacing: -1px; line-height: 1.3; }
+.about-version { display: inline-block; vertical-align: middle; margin-left: 6px; font-size: 11px; letter-spacing: 0; padding: 3px 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-weight: 500; background: var(--surface); }
+.about-identity p { margin: 0; font-size: 13px; color: var(--text-secondary); }
+.about-update { padding: 4px 26px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); margin-bottom: 12px; }
+.about-update .row { align-items: center; padding-bottom: 8px; }
+.about-update .row-label > span { font-weight: 600; }
+.about-update .update-panel > p:first-child { margin: 0; font-size: 12px; }
+.about-update .update-panel { margin-bottom: 0; }
+.about-community { padding: 18px 26px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); margin-bottom: 12px; }
+.about-community-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+.about-community-heading h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.about-license { color: var(--text-secondary); font-size: 11px; }
+.about-support { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.about-community-note { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 12px; color: var(--text-secondary); }
+.about-stars { display: inline-flex; align-items: center; border: 0; padding: 3px 0; border-radius: 3px; background: transparent; cursor: pointer; }
+.about-page .about-link { background: transparent; border-color: transparent; color: var(--text-secondary); }
+.about-page .about-link:hover { background: var(--surface-hover); color: var(--text); }
+.about-community-note svg { color: var(--warning); flex-shrink: 0; }
+.about-contributors { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+.about-maintainer { display: inline-flex; align-items: center; gap: 10px; border: 0; border-radius: 8px; padding: 4px; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.about-maintainer:hover { background: var(--surface-hover); }
+.about-maintainer strong, .about-maintainer small { display: block; }
+.about-maintainer strong { font-size: 13px; font-weight: 600; }
+.about-maintainer small { font-size: 11px; color: var(--text-secondary); }
+.about-maintainer > svg { color: var(--text-faint); }
+.about-avatar { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.about-badge { height: 20px; max-width: 100%; }
+.about-badge-fallback { font-size: 11px; border: 1px solid var(--border); padding: 0 8px; border-radius: 3px; color: var(--text-secondary); }
+.about-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.about-page .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.about-page .about-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.about-page .about-primary:hover { background: var(--accent-strong); }
+.about-footer { text-align: center; color: var(--text-faint); font-size: 11px; line-height: 1.7; padding: 8px 4px; }
+.about-footer p { margin: 4px 0; }
+.about-footer > span { display: block; margin-top: 10px; font-size: 10px; letter-spacing: .2px; }
+@media (max-width: 780px) { .about-hero, .about-community { padding: 20px; } .about-app-icon { width: 60px; height: 60px; } }

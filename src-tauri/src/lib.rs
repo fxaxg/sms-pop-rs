@@ -88,6 +88,7 @@ pub fn run() {
             commands::set_autostart,
             commands::open_config_dir,
             commands::open_logs_dir,
+            commands::open_project_link,
             commands::open_bluetooth_settings,
             commands::get_link_state,
             commands::list_devices,

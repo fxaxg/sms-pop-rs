@@ -3,7 +3,7 @@ import { checkUpdate, downloadUpdate, getUpdateStatus, installUpdate, onUpdateSt
 import { useT } from "../../shared/i18n";
 import { Row } from "../components";
 
-export function SoftwareUpdate({ beforeInstall }: { beforeInstall: () => Promise<void> }) {
+export function SoftwareUpdate({ beforeInstall, label, compact = false }: { beforeInstall: () => Promise<void>; label?: string; compact?: boolean }) {
   const t = useT().updater;
   const [status, setStatus] = useState<UpdateStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export function SoftwareUpdate({ beforeInstall }: { beforeInstall: () => Promise
   const canDownload = phase === "available" || phase === "download_error";
   const size = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   return <>
-    <Row label={t.title} hint={t.hint}>
+    <Row label={label ?? t.title} hint={compact ? undefined : t.hint}>
       <button className="btn" disabled={!status || phase === "disabled" || working || canInstall}
         onClick={() => void run(checkUpdate)}>{t.check}</button>
     </Row>
