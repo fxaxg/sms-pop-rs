@@ -29,21 +29,26 @@ export function About({ beforeInstall }: { beforeInstall: () => Promise<void> })
     <section className="about-hero" aria-label="SmsPop">
       <div className="about-identity">
         <img className="about-app-icon" src={appIcon} alt="" />
-        <div><div className="about-eyebrow">{t.about.identity}</div>
+        <div className="about-hero-content">
           <h2>SmsPop <span className="about-version">v{version}</span></h2>
           <p>{t.about.tagline}</p>
+          <div className="about-actions">
+            <button className="btn about-primary" onClick={() => void open("repository")}><Icon name="external" size={16} />{t.about.repository}</button>
+            <button className="btn about-link" onClick={() => void open("issues")}>{t.about.feedback}<Icon name="external" size={14} /></button>
+          </div>
         </div>
+      </div>
+      <div className="about-support"><p className="about-community-note"><Icon name="star" size={14} />{t.about.starHint}</p>
+        <button className="about-stars" aria-label={t.about.starAction} onClick={() => void open("repository")}>
+          <Badge src="https://img.shields.io/github/stars/fxaxg/sms-pop-rs?style=flat-square&label=Stars&color=737373" label={t.about.starsBadge} />
+        </button>
       </div>
     </section>
     <section className="about-update" aria-label={t.updater.title}>
       <SoftwareUpdate beforeInstall={beforeInstall} compact />
     </section>
-    <section className="about-community" aria-label={t.about.openSource}>
-      <div className="about-community-heading"><h2>{t.about.openSource}</h2><span className="about-license">MIT License</span></div>
-      <div className="about-actions">
-        <button className="btn about-primary" onClick={() => void open("repository")}><Icon name="external" size={16} />{t.about.repository}</button>
-        <button className="btn about-link" onClick={() => void open("issues")}>{t.about.feedback}<Icon name="external" size={14} /></button>
-      </div>
+    <section className="about-community" aria-label={t.about.contributors}>
+      <div className="about-community-heading"><h2>{t.about.contributors}</h2></div>
       <div className="about-contributors">
         <button className="about-maintainer" onClick={() => void open("author")}>
           <span className="about-avatar">F</span>
@@ -51,11 +56,6 @@ export function About({ beforeInstall }: { beforeInstall: () => Promise<void> })
           <Icon name="external" size={14} />
         </button>
         <button className="btn about-link" onClick={() => void open("contributors")}>{t.about.allContributors}<Icon name="external" size={14} /></button>
-      </div>
-      <div className="about-support"><p className="about-community-note"><Icon name="star" size={14} />{t.about.starHint}</p>
-        <button className="about-stars" aria-label={t.about.starAction} onClick={() => void open("repository")}>
-          <Badge src="https://img.shields.io/github/stars/fxaxg/sms-pop-rs?style=flat-square&label=Stars&color=737373" label={t.about.starsBadge} />
-        </button>
       </div>
     </section>
     <footer className="about-footer"><p>{t.about.privacy}</p><span>© SmsPop contributors · MIT License</span></footer>
