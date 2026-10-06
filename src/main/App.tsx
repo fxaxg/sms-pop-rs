@@ -88,6 +88,7 @@ export function App() {
         error={error}
         retry={() => { void autosave.flush(); }}
         beforeClose={() => autosave.flush()}
+        beforeInstall={() => autosave.flushBeforeExit()}
       />
     </LangContext.Provider>
   );
@@ -103,6 +104,7 @@ function Shell(props: {
   error: string | null;
   retry: () => void;
   beforeClose: () => Promise<void>;
+  beforeInstall: () => Promise<void>;
 }) {
   const t = useT();
   const { page, setPage, config, update, saveStatus, saveError, error, retry, beforeClose } = props;
@@ -156,7 +158,7 @@ function Shell(props: {
             {page === "connection" && <Connection />}
             {page === "notifications" && <Notifications config={config} update={update} />}
             {page === "otp" && <Otp config={config} update={update} />}
-            {page === "general" && <General config={config} update={update} />}
+            {page === "general" && <General config={config} update={update} beforeInstall={props.beforeInstall} />}
           </>
         ) : (
           <p className="loading">{t.common.loading}</p>

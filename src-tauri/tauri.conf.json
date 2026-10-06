@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "SmsPop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.smspop.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -30,6 +30,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",
@@ -41,6 +42,13 @@
       "nsis": {
         "installMode": "currentUser"
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyNzU0N0ZENkU5NTgyQjgKUldTNGdwVnUvVWQxMHFRTXdvK3VlRWNOVjc1dlRFL1ZtcDVPRVlIYlZjYS90anArOEp0UjFhcGgK",
+      "endpoints": ["https://github.com/fxaxg/sms-pop-rs/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
     }
   }
 }

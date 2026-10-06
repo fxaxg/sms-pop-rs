@@ -8,7 +8,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 description = "把 iPhone 的通知和验证码接到 Windows 上"
