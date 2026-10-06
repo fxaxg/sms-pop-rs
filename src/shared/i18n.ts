@@ -35,6 +35,7 @@ const zh = {
   },
   shell: {
     navigation: "设置导航",
+    network: "通过 HTTP 接收手机转发的短信与通知。",
     tagline: "手机通知，留在电脑上。",
     connection: "管理接收通知的 iPhone。",
     notifications: "决定哪些通知出现，以及如何显示。",
@@ -44,6 +45,7 @@ const zh = {
   },
   nav: {
     connection: "连接",
+    network: "网络接入",
     notifications: "通知",
     otp: "验证码",
     general: "通用",
@@ -245,6 +247,7 @@ const en: Dict = {
   },
   shell: {
     navigation: "Settings navigation",
+    network: "Receive forwarded phone messages and notifications over HTTP.",
     tagline: "Phone notifications. On your PC.",
     connection: "Manage the iPhone that shares notifications with this PC.",
     notifications: "Choose which notifications appear and how they look.",
@@ -254,6 +257,7 @@ const en: Dict = {
   },
   nav: {
     connection: "Connection",
+    network: "Network",
     notifications: "Notifications",
     otp: "OTP",
     general: "General",

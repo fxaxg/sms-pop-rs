@@ -28,10 +28,17 @@ serde_json = { workspace = true }
 log = { workspace = true }
 tokio = { version = "1", features = ["time"] }
 tauri-plugin-updater = "2"
+axum = "0.8"
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+serde_urlencoded = "0.7"
+tower = { version = "0.5.3", features = ["limit", "util"] }
+if-addrs = "0.14"
 
 [dependencies.windows]
 workspace = true
 features = [
+    "Win32_Security_Cryptography",
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Graphics_Gdi",

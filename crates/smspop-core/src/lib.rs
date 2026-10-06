@@ -24,3 +24,4 @@ pub mod placement;
 pub mod uuid;
 
 pub use model::PhoneNotification;
+pub mod ingress;
