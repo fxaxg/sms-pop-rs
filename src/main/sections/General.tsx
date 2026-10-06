@@ -10,16 +10,14 @@ import {
 } from "../../shared/api";
 import { useT } from "../../shared/i18n";
 import { Row, Section, Toggle } from "../components";
-import { SoftwareUpdate } from "./SoftwareUpdate";
 
 interface Props {
   config: Config;
   update: (mutate: (draft: Config) => void) => void;
-  beforeInstall: () => Promise<void>;
 }
 
 /** 「通用」页：自启、语言、文件位置、关于。 */
-export function General({ config, update, beforeInstall }: Props) {
+export function General({ config, update }: Props) {
   const t = useT();
   const [meta, setMeta] = useState<SettingsMeta | null>(null);
   const [busy, setBusy] = useState(false);
@@ -82,15 +80,6 @@ export function General({ config, update, beforeInstall }: Props) {
         </Row>
       </Section>
 
-      <Section title={t.general.aboutTitle}>
-        <Row label={t.general.version}>
-          <span className="hint-text">{t.general.versionText(meta?.version ?? "…")}</span>
-        </Row>
-        <Row label={t.general.promise}>
-          <span className="hint-text">{t.general.promiseText}</span>
-        </Row>
-        <SoftwareUpdate beforeInstall={beforeInstall} />
-      </Section>
     </>
   );
 }
