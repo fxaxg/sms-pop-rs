@@ -96,6 +96,7 @@ export function NumberField({
   max,
   step = 1,
   suffix,
+  disabled = false,
 }: {
   value: number;
   onChange: (value: number) => void;
@@ -103,11 +104,13 @@ export function NumberField({
   max?: number;
   step?: number;
   suffix?: string;
+  disabled?: boolean;
 }) {
   return (
     <span className="number-field">
       <input
         type="number"
+        disabled={disabled}
         value={value}
         min={min}
         max={max}

@@ -6,10 +6,12 @@ mod app_launcher;
 mod caret;
 mod commands;
 mod devices;
+mod http_ingress;
 mod link_worker;
 mod paths;
 mod popups;
 mod state;
+mod token_store;
 mod tray;
 mod types;
 mod updater;
@@ -51,6 +53,8 @@ pub fn run() {
             }
 
             app.manage(AppState::new(app.handle()));
+            app.manage(http_ingress::HttpIngress::load(app.handle()));
+            http_ingress::start(app.handle().clone());
 
             tray::setup(app.handle())?;
             link_worker::spawn(app.handle().clone());
@@ -79,6 +83,12 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
+            http_ingress::get_http_status,
+            http_ingress::list_http_addresses,
+            http_ingress::open_firewall_rules,
+            http_ingress::configure_http,
+            http_ingress::reset_http_token,
+            http_ingress::set_http_copy,
             updater::get_update_status,
             updater::check_update,
             updater::download_update,
@@ -113,6 +123,7 @@ pub fn run() {
         .expect("构建 Tauri 应用失败")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                http_ingress::stop(app);
                 app.state::<AppState>()
                     .link_stop
                     .store(true, std::sync::atomic::Ordering::Relaxed);

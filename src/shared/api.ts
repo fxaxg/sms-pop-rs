@@ -92,6 +92,16 @@ export const openBluetoothSettings = () => invoke<void>("open_bluetooth_settings
 export type ProjectLink = "repository" | "contributors" | "issues" | "author";
 export const openProjectLink = (target: ProjectLink) => invoke<void>("open_project_link", { target });
 
+export interface HttpDevice { id: string; name: string; allow_copy: boolean; last_received: number | null }
+export interface HttpStatus { token: string | null; settings: { enabled: boolean; bind: string; port: number; allow_copy: boolean; devices: HttpDevice[] }; running: boolean; error: string | null }
+export const resetHttpToken = () => invoke<void>("reset_http_token");
+export const setHttpCopy = (allowCopy: boolean) => invoke<void>("set_http_copy", { allowCopy });
+export const getHttpStatus = () => invoke<HttpStatus>("get_http_status");
+export interface LocalAddress { name: string; address: string }
+export const listHttpAddresses = () => invoke<LocalAddress[]>("list_http_addresses");
+export const openFirewallRules = () => invoke<void>("open_firewall_rules");
+export const configureHttp = (enabled: boolean, bind: string, port: number) => invoke<void>("configure_http", { enabled, bind, port });
+
 export interface UpdateStatus {
   revision: number;
   phase: "disabled" | "idle" | "checking" | "latest" | "available" | "downloading" | "ready" | "installing" | "check_error" | "download_error" | "install_error";
