@@ -6,15 +6,17 @@ import { Notifications } from "./sections/Notifications";
 import { Otp } from "./sections/Otp";
 import { General } from "./sections/General";
 import { About } from "./sections/About";
+import { Network } from "./sections/Network";
 import { Icon, type IconName } from "../shared/Icon";
 import { applyTheme } from "../shared/theme";
 import { AutoSave, type SaveStatus } from "../shared/autosave";
 import { Titlebar } from "./Titlebar";
 
-type Page = "connection" | "notifications" | "otp" | "general" | "about";
+type Page = "connection" | "network" | "notifications" | "otp" | "general" | "about";
 
 const NAV_ICONS: Record<Page, IconName> = {
   connection: "phone",
+  network: "external",
   notifications: "bell",
   otp: "code",
   general: "settings",
@@ -113,6 +115,7 @@ function Shell(props: {
 
   const nav: { key: Page; label: string }[] = [
     { key: "connection", label: t.nav.connection },
+    { key: "network", label: t.nav.network },
     { key: "notifications", label: t.nav.notifications },
     { key: "otp", label: t.nav.otp },
     { key: "general", label: t.nav.general },
@@ -159,6 +162,7 @@ function Shell(props: {
         {config ? (
           <>
             {page === "connection" && <Connection />}
+            {page === "network" && <Network />}
             {page === "notifications" && <Notifications config={config} update={update} />}
             {page === "otp" && <Otp config={config} update={update} />}
             {page === "general" && <General config={config} update={update} />}

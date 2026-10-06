@@ -174,6 +174,20 @@ pub fn emit_devices(app: &AppHandle) {
 
 /// 一条通知进来了。全走真实路径：去重 → 过滤 → 复制 / 弹窗 / 候选条。
 pub fn dispatch_notification(app: &AppHandle, notification: PhoneNotification) {
+    dispatch_with_policy(app, notification, true, true);
+}
+
+/// 网络入口已自行按消息标识去重，不受 BLE 订阅宽限期影响。
+pub fn dispatch_network(app: &AppHandle, notification: PhoneNotification, allow_copy: bool) {
+    dispatch_with_policy(app, notification, false, allow_copy);
+}
+
+fn dispatch_with_policy(
+    app: &AppHandle,
+    notification: PhoneNotification,
+    ble: bool,
+    allow_copy: bool,
+) {
     let state = app.state::<AppState>();
 
     // 订阅成功后的宽限期里按内容去重 —— iOS 会把通知中心存量用新 uid 重推一遍。
@@ -183,7 +197,9 @@ pub fn dispatch_notification(app: &AppHandle, notification: PhoneNotification) {
         .unwrap()
         .is_some_and(|t| t.elapsed() < Duration::from_secs(5));
 
-    let duplicate = if in_grace {
+    let duplicate = if !ble {
+        false
+    } else if in_grace {
         state
             .dedup
             .is_duplicate_key_at(&notification.content_key(), std::time::Instant::now())
@@ -192,21 +208,21 @@ pub fn dispatch_notification(app: &AppHandle, notification: PhoneNotification) {
     };
 
     if duplicate {
-        info!("重复通知，忽略：{}", notification.summary());
+        info!("重复通知，忽略");
         return;
     }
 
     let config = state.config();
 
     if !config.passes_filter(&notification) {
-        info!("被过滤规则拦下：{}", notification.summary());
+        info!("通知被过滤规则拦下");
         return;
     }
 
     let offer_otp = config.should_offer_otp(&notification);
 
     // ① 验证码 → 剪贴板（纯被动，不碰任何程序）
-    if offer_otp && config.otp.auto_copy {
+    if offer_otp && config.otp.auto_copy && allow_copy {
         if let Some(code) = notification.code.as_deref() {
             if let Err(error) = app.clipboard().write_text(code.to_string()) {
                 warn!("写剪贴板失败：{error}");
