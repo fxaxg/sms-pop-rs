@@ -537,3 +537,6 @@
   .device-badges { flex-wrap: wrap; justify-content: flex-end; }
   .local-test { align-items: flex-start; flex-direction: column; gap: 12px; }
 }
+.update-panel { margin: 0 0 16px; }
+.update-panel progress { width: 100%; }
+.update-notes { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; font-size: 13px; }

@@ -12,6 +12,7 @@ mod popups;
 mod state;
 mod tray;
 mod types;
+mod updater;
 
 use log::info;
 use smspop_core::config::Config;
@@ -41,6 +42,8 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updater::UpdateState::default())
         .setup(|app| {
             let first_run = !paths::config_path(app.handle()).exists();
             if first_run {
@@ -51,6 +54,7 @@ pub fn run() {
 
             tray::setup(app.handle())?;
             link_worker::spawn(app.handle().clone());
+            updater::start(app.handle().clone());
 
             // 主窗口关到托盘，不退出
             if let Some(main_window) = app.get_webview_window("main") {
@@ -75,6 +79,10 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
+            updater::get_update_status,
+            updater::check_update,
+            updater::download_update,
+            updater::install_update,
             commands::save_config,
             commands::get_settings_meta,
             commands::set_autostart,
