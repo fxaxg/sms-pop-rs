@@ -62,7 +62,12 @@ impl PhoneNotification {
 
     /// 保守提取短信正文签名；无法识别时由 UI 显示通用文案。
     pub fn otp_source_hint(&self) -> Option<String> {
-        if !self.has_code() || self.app_identifier.as_deref() != Some("com.apple.MobileSMS") {
+        if !self.has_code()
+            || !matches!(
+                self.app_identifier.as_deref(),
+                Some("com.apple.MobileSMS" | "smspop.network.sms")
+            )
+        {
             return None;
         }
         crate::otp_source::extract_sms_source(self.message.as_deref()?)
