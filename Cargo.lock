@@ -3804,7 +3804,7 @@ dependencies = [
 
 [[package]]
 name = "smspop-app"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "if-addrs",
@@ -3831,7 +3831,7 @@ dependencies = [
 
 [[package]]
 name = "smspop-ble"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "log",
  "pollster",
@@ -3841,7 +3841,7 @@ dependencies = [
 
 [[package]]
 name = "smspop-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3849,7 +3849,7 @@ dependencies = [
 
 [[package]]
 name = "smspop-uia"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "log",
  "smspop-core",
