@@ -47,4 +47,11 @@ export class AutoSave<T> {
       this.writing = false;
     }
   }
+
+  /** 安装更新前必须等待在途写入，并阻止保存失败时退出。 */
+  async flushBeforeExit() {
+    while (this.writing) await new Promise((resolve) => setTimeout(resolve, 20));
+    await this.flush();
+    if (this.pending) throw new Error("Settings could not be saved. Retry before installing the update.");
+  }
 }

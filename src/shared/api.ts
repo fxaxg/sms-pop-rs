@@ -90,6 +90,22 @@ export const openConfigDir = () => invoke<void>("open_config_dir");
 export const openLogsDir = () => invoke<void>("open_logs_dir");
 export const openBluetoothSettings = () => invoke<void>("open_bluetooth_settings");
 
+export interface UpdateStatus {
+  revision: number;
+  phase: "disabled" | "idle" | "checking" | "latest" | "available" | "downloading" | "ready" | "installing" | "check_error" | "download_error" | "install_error";
+  version: string | null;
+  notes: string | null;
+  downloaded: number;
+  total: number | null;
+  error: string | null;
+}
+export const getUpdateStatus = () => invoke<UpdateStatus>("get_update_status");
+export const checkUpdate = () => invoke<void>("check_update");
+export const downloadUpdate = () => invoke<void>("download_update");
+export const installUpdate = () => invoke<void>("install_update");
+export const onUpdateStatus = (handler: (status: UpdateStatus) => void) =>
+  listen<UpdateStatus>("update-status", (event) => handler(event.payload));
+
 // ── 链路状态 ──────────────────────────────────────────────────
 
 export interface LinkStatePayload {
