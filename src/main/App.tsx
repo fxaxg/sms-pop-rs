@@ -5,18 +5,20 @@ import { Connection } from "./sections/Connection";
 import { Notifications } from "./sections/Notifications";
 import { Otp } from "./sections/Otp";
 import { General } from "./sections/General";
+import { About } from "./sections/About";
 import { Icon, type IconName } from "../shared/Icon";
 import { applyTheme } from "../shared/theme";
 import { AutoSave, type SaveStatus } from "../shared/autosave";
 import { Titlebar } from "./Titlebar";
 
-type Page = "connection" | "notifications" | "otp" | "general";
+type Page = "connection" | "notifications" | "otp" | "general" | "about";
 
 const NAV_ICONS: Record<Page, IconName> = {
   connection: "phone",
   notifications: "bell",
   otp: "code",
   general: "settings",
+  about: "info",
 };
 
 export function App() {
@@ -114,6 +116,7 @@ function Shell(props: {
     { key: "notifications", label: t.nav.notifications },
     { key: "otp", label: t.nav.otp },
     { key: "general", label: t.nav.general },
+    { key: "about", label: t.nav.about },
   ];
 
   return (
@@ -158,7 +161,8 @@ function Shell(props: {
             {page === "connection" && <Connection />}
             {page === "notifications" && <Notifications config={config} update={update} />}
             {page === "otp" && <Otp config={config} update={update} />}
-            {page === "general" && <General config={config} update={update} beforeInstall={props.beforeInstall} />}
+            {page === "general" && <General config={config} update={update} />}
+            {page === "about" && <About beforeInstall={props.beforeInstall} />}
           </>
         ) : (
           <p className="loading">{t.common.loading}</p>
