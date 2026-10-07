@@ -11,6 +11,10 @@
   <p><a href="#开始使用">开始使用</a> · <a href="#连接-iphone">连接 iPhone</a> · <a href="#开发">开发</a> · <a href="CONTRIBUTING.md">参与贡献</a></p>
 </div>
 
+## 使用演示
+
+https://github.com/user-attachments/assets/ac2c4289-9e66-47c9-bec0-208e82811a7e
+
 ## 它能做什么
 
 - **接收手机通知**：在屏幕右下角显示 iPhone 通知。
