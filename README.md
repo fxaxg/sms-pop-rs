@@ -116,5 +116,3 @@ Windows 安装包输出到 `target/release/bundle/nsis/`。应用图标源文件
 ## 许可证
 
 [MIT](LICENSE)。
-
-
