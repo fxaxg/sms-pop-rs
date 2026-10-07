@@ -109,6 +109,12 @@ Windows 安装包输出到 `target/release/bundle/nsis/`。应用图标源文件
 
 欢迎提交可复现的问题、设备兼容性结果和改进建议。开发流程、测试要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
+## 友链
+
+- [Linux.do](https://linux.do/)
+
 ## 许可证
 
 [MIT](LICENSE)。
+
+
