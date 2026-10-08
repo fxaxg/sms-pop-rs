@@ -1,12 +1,16 @@
 //! 已知 iPhone 注册表：持久化、选择偏好和 UI 负载。
 
 use std::path::PathBuf;
+#[cfg(windows)]
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use log::warn;
 use serde::{Deserialize, Serialize};
-use smspop_ble::DeviceInfo;
-use smspop_core::devices::{sort_candidate_ids, KnownDevice};
+#[cfg(windows)]
+use smspop_core::devices::sort_candidate_ids;
+use smspop_core::devices::KnownDevice;
+#[cfg(windows)]
+use smspop_core::link::DeviceInfo;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct StoredDevices {
@@ -63,6 +67,7 @@ impl DeviceRegistry {
         }
     }
 
+    #[cfg(windows)]
     pub fn discover(&mut self, discovered: &[DeviceInfo]) -> Vec<String> {
         let now = now_ms();
         self.online_ids = discovered.iter().map(|device| device.id.clone()).collect();
@@ -89,6 +94,7 @@ impl DeviceRegistry {
         )
     }
 
+    #[cfg(windows)]
     pub fn set_active(&mut self, device: Option<&DeviceInfo>) {
         let previous_id = self.active_id.clone();
         self.active_id = device.map(|device| device.id.clone());
@@ -108,6 +114,7 @@ impl DeviceRegistry {
         }
     }
 
+    #[cfg(windows)]
     pub fn set_battery_level(&mut self, id: &str, level: u8) {
         if self
             .active_id
@@ -118,6 +125,7 @@ impl DeviceRegistry {
         }
     }
 
+    #[cfg(windows)]
     pub fn mark_verified(&mut self, id: &str) {
         if let Some(device) = self.find_mut(id) {
             device.last_verified_unix_ms = Some(now_ms());
@@ -211,6 +219,7 @@ impl DeviceRegistry {
         payloads
     }
 
+    #[cfg(windows)]
     pub fn active_id(&self) -> Option<String> {
         self.active_id.clone()
     }
@@ -234,6 +243,7 @@ impl DeviceRegistry {
     }
 }
 
+#[cfg(windows)]
 fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

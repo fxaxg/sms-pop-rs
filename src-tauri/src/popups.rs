@@ -64,7 +64,7 @@ pub fn show(app: &AppHandle, notification: &PhoneNotification) {
         duration_secs: popup.duration_seconds,
     };
 
-    info!("弹窗：{} — {}", payload.origin, payload.body);
+    info!("显示通知弹窗");
 
     state
         .pending_toasts
@@ -100,6 +100,7 @@ pub fn show(app: &AppHandle, notification: &PhoneNotification) {
             return;
         }
     };
+    info!("通知窗口已创建: {label}");
 
     {
         let mut open = state.toasts.lock().unwrap();
@@ -130,6 +131,7 @@ pub fn show(app: &AppHandle, notification: &PhoneNotification) {
 
 /// 前端量出了真实高度 → 记高度、改尺寸、重排、显示。
 pub fn resize_and_show(app: &AppHandle, label: &str, height_dip: f64) {
+    info!("通知前端已就绪: {label}");
     let height = height_dip.clamp(MIN_HEIGHT, MAX_HEIGHT);
     let state = app.state::<AppState>();
 
@@ -151,7 +153,10 @@ pub fn resize_and_show(app: &AppHandle, label: &str, height_dip: f64) {
     )));
 
     reposition_all(app);
-    let _ = window.show();
+    match window.show() {
+        Ok(()) => info!("通知窗口已显示: {label}"),
+        Err(error) => warn!("显示通知窗口失败: {error}"),
+    }
 }
 
 /// 关掉一个 toast（用户点掉 / 超时 / 被挤掉）。

@@ -1,51 +1,73 @@
-//! Windows 当前用户 DPAPI；配置只保存加密字节，禁止打印令牌。
-use windows::Win32::Foundation::{LocalFree, HLOCAL};
-use windows::Win32::Security::Cryptography::{
-    CryptProtectData, CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
-};
+//! OS credential storage. Config contains an opaque reference, never a plaintext token.
+#[cfg(all(target_os = "macos", not(test)))]
+mod macos;
+#[cfg(all(windows, not(test)))]
+mod windows;
+#[cfg(all(target_os = "macos", not(test)))]
+pub use macos::{load, remove, store};
+#[cfg(all(windows, not(test)))]
+pub fn store(token: &str) -> Result<Vec<u8>, String> {
+    windows::protect(token.as_bytes(), false)
+}
+#[cfg(all(windows, not(test)))]
+pub fn load(reference: &[u8]) -> Result<String, String> {
+    String::from_utf8(windows::protect(reference, true)?).map_err(|_| "Invalid credential".into())
+}
+#[cfg(all(windows, not(test)))]
+pub fn remove(_: &[u8]) -> Result<(), String> {
+    Ok(())
+}
 
-pub fn protect(bytes: &[u8], decrypt: bool) -> Result<Vec<u8>, String> {
-    let input = CRYPT_INTEGER_BLOB {
-        cbData: bytes.len() as u32,
-        pbData: bytes.as_ptr() as *mut u8,
+pub fn replace(
+    old: &[u8],
+    token: &str,
+    persist: impl FnOnce(&[u8]) -> Result<(), String>,
+) -> Result<Vec<u8>, String> {
+    let next = store(token)?;
+    if let Err(e) = persist(&next) {
+        let _ = remove(&next);
+        return Err(e);
+    }
+    if !old.is_empty() {
+        let _ = remove(old);
+    }
+    Ok(next)
+}
+
+#[cfg(test)]
+mod memory {
+    use std::{
+        collections::HashMap,
+        sync::{
+            atomic::{AtomicU64, Ordering},
+            Mutex, OnceLock,
+        },
     };
-    let mut output = CRYPT_INTEGER_BLOB::default();
-    unsafe {
-        let result = if decrypt {
-            CryptUnprotectData(
-                &input,
-                None,
-                None,
-                None,
-                None,
-                CRYPTPROTECT_UI_FORBIDDEN,
-                &mut output,
-            )
-        } else {
-            CryptProtectData(
-                &input,
-                windows::core::PCWSTR::null(),
-                None,
-                None,
-                None,
-                CRYPTPROTECT_UI_FORBIDDEN,
-                &mut output,
-            )
-        };
-        result.map_err(|_| {
-            "Cannot access encrypted receiver token for this Windows user".to_string()
-        })?;
-        let bytes = std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
-        let _ = LocalFree(Some(HLOCAL(output.pbData.cast())));
-        Ok(bytes)
+    static ITEMS: OnceLock<Mutex<HashMap<Vec<u8>, String>>> = OnceLock::new();
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+    fn items() -> &'static Mutex<HashMap<Vec<u8>, String>> {
+        ITEMS.get_or_init(Default::default)
+    }
+    pub fn store(token: &str) -> Result<Vec<u8>, String> {
+        let id = SEQ.fetch_add(1, Ordering::SeqCst).to_le_bytes().to_vec();
+        items().lock().unwrap().insert(id.clone(), token.into());
+        Ok(id)
+    }
+    pub fn load(reference: &[u8]) -> Result<String, String> {
+        items()
+            .lock()
+            .unwrap()
+            .get(reference)
+            .cloned()
+            .ok_or("Credential unavailable".into())
+    }
+    pub fn remove(reference: &[u8]) -> Result<(), String> {
+        items().lock().unwrap().remove(reference);
+        Ok(())
     }
 }
 #[cfg(test)]
-mod tests {
-    #[test]
-    fn encrypted_token_roundtrip() {
-        let cipher = super::protect(b"test-token", false).unwrap();
-        assert_ne!(cipher, b"test-token");
-        assert_eq!(super::protect(&cipher, true).unwrap(), b"test-token");
-    }
-}
+pub use memory::{load, remove, store};
+#[cfg(test)]
+#[path = "token_store/tests.rs"]
+mod tests;

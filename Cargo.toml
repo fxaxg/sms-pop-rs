@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+default-members = ["crates/smspop-core", "src-tauri"]
 members = [
     "crates/smspop-core",
     "crates/smspop-ble",

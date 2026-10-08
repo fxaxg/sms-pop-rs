@@ -1,0 +1,4 @@
+{
+  "bundle": { "targets": ["app"], "createUpdaterArtifacts": false },
+  "app": { "macOSPrivateApi": true }
+}

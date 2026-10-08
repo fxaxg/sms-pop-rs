@@ -4,10 +4,13 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::{Arc, Mutex, RwLock};
 
-use log::{info, warn};
-use smspop_ble::LinkState;
+#[cfg(windows)]
+use log::info;
+use log::warn;
 use smspop_core::config::Config;
 use smspop_core::dedup::NotificationDeduplicator;
+use smspop_core::link::LinkState;
+#[cfg(windows)]
 use smspop_uia::UiaWorker;
 use tauri::AppHandle;
 
@@ -16,6 +19,7 @@ use crate::paths;
 use crate::types::{CaretOffer, ToastPayload};
 
 pub struct AppState {
+    pub otp_candidate: Mutex<smspop_core::otp_candidate::OtpCandidateStore>,
     /// 当前生效的配置（设置界面保存后整体替换）。
     pub config: RwLock<Config>,
 
@@ -26,6 +30,7 @@ pub struct AppState {
     pub dedup: NotificationDeduplicator,
 
     /// UIA 工作线程。初始化失败时为 `None`（只损失光标候选功能）。
+    #[cfg(windows)]
     pub uia: RwLock<Option<UiaWorker>>,
 
     /// 蓝牙链路的停止开关。
@@ -64,6 +69,7 @@ pub struct AppState {
     pub caret_offer: Mutex<Option<CaretOffer>>,
 
     /// 候选条提议代数。
+    #[cfg(windows)]
     pub caret_generation: AtomicU64,
 }
 
@@ -78,10 +84,11 @@ impl AppState {
                 warn!("配置读取失败（{error}），备份后使用默认配置");
                 let backup = config_path.with_extension("json.bak");
                 let _ = std::fs::copy(&config_path, backup);
-                Config::default()
+                Config::initial_for_platform(cfg!(target_os = "macos"))
             }
         };
 
+        #[cfg(windows)]
         let uia =
             match UiaWorker::spawn(config.otp.insertion.mode, config.otp.insertion.type_delay()) {
                 Ok(worker) => Some(worker),
@@ -92,9 +99,11 @@ impl AppState {
             };
 
         Self {
+            otp_candidate: Mutex::new(Default::default()),
             config: RwLock::new(config),
             link_state: RwLock::new((LinkState::Stopped, None)),
             dedup: NotificationDeduplicator::default(),
+            #[cfg(windows)]
             uia: RwLock::new(uia),
             link_stop: Arc::new(AtomicBool::new(false)),
             subscribed_at: Mutex::new(None),
@@ -106,6 +115,7 @@ impl AppState {
             toast_seq: AtomicU64::new(0),
             autostart_item: Mutex::new(None),
             caret_offer: Mutex::new(None),
+            #[cfg(windows)]
             caret_generation: AtomicU64::new(0),
         }
     }
@@ -120,6 +130,7 @@ impl AppState {
 
     /// 替换配置；如果填入方式变了，顺带重启 UIA 工作线程让新配置生效。
     pub fn apply_config(&self, config: Config) {
+        #[cfg(windows)]
         let old = self.config();
         let mut guard = self
             .config
@@ -128,9 +139,11 @@ impl AppState {
         *guard = config.clone();
         drop(guard);
 
+        #[cfg(windows)]
         let insertion_changed = old.otp.insertion.mode != config.otp.insertion.mode
             || old.otp.insertion.type_delay() != config.otp.insertion.type_delay();
 
+        #[cfg(windows)]
         if insertion_changed {
             info!("填入方式变化，重启 UIA 工作线程");
             let mut uia = self

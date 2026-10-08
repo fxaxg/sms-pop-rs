@@ -1,7 +1,8 @@
 //! 系统托盘：图标 + 菜单 + 状态 tooltip。
 
 use log::warn;
-use smspop_ble::LinkState;
+#[cfg(windows)]
+use smspop_core::link::LinkState;
 use tauri::menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager};
@@ -100,6 +101,7 @@ pub fn open_main_window(app: &AppHandle) {
 }
 
 /// 链路状态变了 → 更新 tooltip。
+#[cfg(windows)]
 pub fn on_link_state(app: &AppHandle, state: LinkState, verified: bool) {
     let en = app.state::<AppState>().config().general.language == "en";
     let label = if en {

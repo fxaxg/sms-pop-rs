@@ -4,15 +4,18 @@ use serde::{Deserialize, Serialize};
 use smspop_core::placement::RectD;
 
 /// 链路状态变化事件（Rust → 所有前端窗口）。
+#[cfg(windows)]
 pub const EVENT_LINK_STATE: &str = "link-state";
+#[cfg(windows)]
 pub const EVENT_DEVICES_CHANGED: &str = "devices-changed";
 
 /// 候选条有新验证码（Rust → caret 窗口）。
+#[cfg(windows)]
 pub const EVENT_CARET_OFFER: &str = "caret-offer";
 
 /// 链路状态 → 机器可读标识（前端按它判断，别看人话文案）。
-pub fn state_key(state: smspop_ble::LinkState) -> &'static str {
-    use smspop_ble::LinkState;
+pub fn state_key(state: smspop_core::link::LinkState) -> &'static str {
+    use smspop_core::link::LinkState;
 
     match state {
         LinkState::Stopped => "stopped",
@@ -58,6 +61,7 @@ pub struct ToastPayload {
 
 /// 当前生效的候选条提议。
 #[derive(Debug, Clone)]
+#[cfg_attr(not(windows), allow(dead_code))]
 pub struct CaretOffer {
     /// 单调递增的代数 —— 防止迟到的布局/隐藏请求误伤新提议。
     pub generation: u64,
@@ -77,6 +81,7 @@ pub struct CaretOffer {
 
 /// 前端请求的布局信息。
 #[derive(Debug, Clone, Copy, Deserialize)]
+#[cfg_attr(not(windows), allow(dead_code))]
 pub struct CaretLayout {
     pub generation: u64,
     pub width: f64,
