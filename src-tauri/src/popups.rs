@@ -64,7 +64,7 @@ pub fn show(app: &AppHandle, notification: &PhoneNotification) {
         duration_secs: popup.duration_seconds,
     };
 
-    info!("弹窗：{} — {}", payload.origin, payload.body);
+    info!("显示通知弹窗");
 
     state
         .pending_toasts

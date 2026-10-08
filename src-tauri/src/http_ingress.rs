@@ -1,4 +1,4 @@
-//! 默认关闭的入站 Webhook。统一令牌用当前 Windows 用户 DPAPI 加密保存。
+//! 默认关闭的入站 Webhook。统一令牌使用系统安全存储。
 use axum::{
     extract::{Request, State},
     http::StatusCode,
@@ -132,12 +132,9 @@ pub fn list_http_addresses(window: tauri::WebviewWindow) -> Result<Vec<LocalAddr
 #[tauri::command]
 pub fn open_firewall_rules(window: tauri::WebviewWindow) -> Result<(), String> {
     main_only(&window)?;
-    std::process::Command::new("mmc.exe")
-        .arg("wf.msc")
-        .spawn()
-        .map_err(|e| format!("Cannot open firewall rules: {e}"))?;
-    Ok(())
+    crate::platform::open_firewall()
 }
+
 impl HttpIngress {
     pub fn load(app: &AppHandle) -> Self {
         let mut settings: Settings = match std::fs::read(path(app)) {
@@ -155,20 +152,24 @@ impl HttpIngress {
                 uuid::Uuid::new_v4().simple(),
                 uuid::Uuid::new_v4().simple()
             );
-            match crate::token_store::protect(token.as_bytes(), false).and_then(|cipher| {
-                settings.encrypted_token = cipher;
+            match crate::token_store::replace(&[], &token, |reference| {
+                settings.encrypted_token = reference.to_vec();
                 save(app, &settings)
             }) {
-                Ok(()) => {}
+                Ok(_) => {}
                 Err(_) => log::warn!("Receiver token initialization failed; receiver disabled"),
             }
+        }
+        let credential_error = crate::token_store::load(&settings.encrypted_token).err();
+        if credential_error.is_some() {
+            settings.enabled = false;
         }
         Self {
             inner: Arc::new(Mutex::new(Inner {
                 generation: 0,
                 settings,
                 running: false,
-                error: None,
+                error: credential_error,
                 shutdown: None,
                 stopped: None,
                 seen: HashMap::new(),
@@ -189,9 +190,7 @@ pub fn get_http_status(window: tauri::WebviewWindow, app: AppHandle) -> Result<S
         d.token_hash.clear();
     }
     Ok(Status {
-        token: crate::token_store::protect(&inner.settings.encrypted_token, true)
-            .ok()
-            .and_then(|b| String::from_utf8(b).ok()),
+        token: crate::token_store::load(&inner.settings.encrypted_token).ok(),
         settings,
         running: inner.running,
         error: inner.error.clone(),
@@ -314,8 +313,8 @@ async fn receive(State(server): State<Server>, request: Request) -> Response {
     }
     let device = {
         let i = server.inner.lock().unwrap();
-        let token = crate::token_store::protect(&i.settings.encrypted_token, true).ok();
-        if token.as_deref() != Some(tokens[0].as_bytes()) || tokens[0].is_empty() {
+        let token = crate::token_store::load(&i.settings.encrypted_token).ok();
+        if token.as_deref() != Some(tokens[0].as_str()) || tokens[0].is_empty() {
             return reply(StatusCode::UNAUTHORIZED, "unauthorized");
         }
         Device {
@@ -335,9 +334,9 @@ async fn receive(State(server): State<Server>, request: Request) -> Response {
     // 在读取 body 期间被撤销的令牌不能继续入队。
     if !i.settings.enabled
         || i.generation != server.generation
-        || crate::token_store::protect(&i.settings.encrypted_token, true)
+        || crate::token_store::load(&i.settings.encrypted_token)
             .ok()
-            .is_none_or(|token| hash(&String::from_utf8_lossy(&token)) != device.token_hash)
+            .is_none_or(|token| hash(&token) != device.token_hash)
     {
         return reply(StatusCode::UNAUTHORIZED, "revoked");
     }
@@ -402,6 +401,7 @@ async fn launch(app: AppHandle) -> Result<(), String> {
     if !matches!(settings.bind.as_str(), "127.0.0.1" | "0.0.0.0") || settings.port == 0 {
         return Err("Invalid bind address or port".into());
     }
+    crate::token_store::load(&settings.encrypted_token)?;
     let listener = tokio::net::TcpListener::bind((settings.bind.as_str(), settings.port))
         .await
         .map_err(|e| format!("Listener unavailable: {e}"))?;
@@ -416,11 +416,9 @@ async fn launch(app: AppHandle) -> Result<(), String> {
                 let i = s.inner.lock().unwrap();
                 if i.settings.enabled
                     && i.generation == generation
-                    && crate::token_store::protect(&i.settings.encrypted_token, true)
+                    && crate::token_store::load(&i.settings.encrypted_token)
                         .ok()
-                        .is_some_and(|token| {
-                            hash(&String::from_utf8_lossy(&token)) == device.token_hash
-                        })
+                        .is_some_and(|token| hash(&token) == device.token_hash)
                 {
                     let mut device = device.clone();
                     device.allow_copy = i.settings.allow_copy;
@@ -430,7 +428,7 @@ async fn launch(app: AppHandle) -> Result<(), String> {
                 }
             };
             if let Some(device) = current {
-                crate::link_worker::dispatch_network(
+                crate::notification_dispatch::dispatch_network(
                     &worker_app,
                     message.into_notification(format!("http:{}", device.id), device.name, uid),
                     device.allow_copy,
@@ -488,6 +486,9 @@ pub async fn configure_http(
     let stopped = {
         let mut i = state.inner.lock().unwrap();
         let mut next = i.settings.clone();
+        if enabled {
+            crate::token_store::load(&next.encrypted_token)?;
+        }
         next.enabled = enabled;
         next.bind = bind;
         next.port = port;
@@ -542,9 +543,13 @@ pub fn reset_http_token(window: tauri::WebviewWindow, app: AppHandle) -> Result<
         uuid::Uuid::new_v4().simple(),
         uuid::Uuid::new_v4().simple()
     );
-    next.encrypted_token = crate::token_store::protect(token.as_bytes(), false)?;
     next.devices.clear();
-    save(&app, &next)?;
+    next.encrypted_token =
+        crate::token_store::replace(&i.settings.encrypted_token, &token, |reference| {
+            let mut saved = next.clone();
+            saved.encrypted_token = reference.to_vec();
+            save(&app, &saved)
+        })?;
     i.settings = next;
     i.seen.clear();
     Ok(())
@@ -573,7 +578,7 @@ mod tests {
         let (queue, rx) = mpsc::channel(1);
         let inner = Arc::new(Mutex::new(Inner {
             settings: Settings {
-                encrypted_token: crate::token_store::protect(b"secret", false).unwrap(),
+                encrypted_token: crate::token_store::store("secret").unwrap(),
                 enabled: true,
                 devices: vec![Device {
                     id: "test".into(),

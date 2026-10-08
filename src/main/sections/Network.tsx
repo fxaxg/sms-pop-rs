@@ -1,3 +1,4 @@
+import { usePlatform } from "../../shared/platform";
 import { useContext, useEffect, useRef, useState } from "react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { configureHttp, getHttpStatus, listHttpAddresses, resetHttpToken, setHttpCopy, type HttpStatus, type LocalAddress } from "../../shared/api";
@@ -6,6 +7,7 @@ import { networkDict } from "../../shared/network-i18n";
 import { Disclosure, Modal, NumberField, Row, Section, Toggle } from "../components";
 
 export function Network() {
+  const platform=usePlatform();
   const lang=useContext(LangContext), t=networkDict[lang];
   const text=(zh:string,en:string)=>lang==="zh"?zh:en;
   const [status,setStatus]=useState<HttpStatus|null>(null),[bind,setBind]=useState("0.0.0.0"),[port,setPort]=useState(24836);
@@ -28,6 +30,10 @@ export function Network() {
   const curl=`curl.exe -G "${endpoint}" \`\n  --data-urlencode "token=YOUR_TOKEN" \`\n  --data-urlencode "device_name=Android" \`\n  --data-urlencode "body=Verification code: 123456"`;
   const python=`import getpass, json, urllib.request\nfrom urllib.parse import urlencode\n\nurl = "${endpoint}?" + urlencode({"token": getpass.getpass("Token: ")})\ndata = json.dumps({"device_name": "Android", "body": "验证码 123456"}).encode("utf-8")\nrequest = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")\nwith urllib.request.urlopen(request, timeout=10) as response:\n    print(response.status, response.read().decode("utf-8"))`;
   return <>
+    {platform.os==="macos" && <Section title="安卓 → Mac · 同一 Wi-Fi" description="先开启下方接收服务，再配置手机。">
+      <ol><li>手机与 Mac 连接同一 Wi-Fi。接收范围选择“局域网”。</li><li>点击“仅复制接口地址”，填入 SmsForwarder 的 Webhook 发送通道，选择 POST 表单。</li><li>表单字段：<code>device_name=Android&amp;from=[from]&amp;content=[content]</code>。建立短信转发规则，并授予短信和后台运行权限。</li><li>发送测试短信。收到验证码后可点击复制，或在目标输入框按 ⌘⇧V；权限与快捷键在“验证码”页配置。</li></ol>
+      <p className="hint-text">HTTP 仅用于可信 Wi-Fi，令牌不加密短信。公司/访客 Wi-Fi 可能禁止设备互访；Mac 防火墙需允许 SmsPop 入站。切换网络后通过“网卡”刷新地址并重新配置手机。休眠或退出时无法接收。</p>
+    </Section>}
     <Section title={t.receiver} action={<span className="network-status" role="status">{status?.running?t.running:status?.settings.enabled?t.failed:t.stopped}</span>}>
       <Row label={t.enable}><Toggle checked={status?.settings.enabled??false} disabled={busy||!status} onChange={v=>void run(()=>configureHttp(v,status!.settings.bind,status!.settings.port))}/></Row>
       <Row label={t.scope}><select className="select" value={bind} disabled={busy} onChange={e=>setBind(e.target.value)}><option value="127.0.0.1">{t.local}</option><option value="0.0.0.0">{t.lan}</option></select></Row>
@@ -56,7 +62,7 @@ export function Network() {
         <Disclosure title="curl · PowerShell"><pre className="network-code">{curl}</pre><button className="btn" onClick={()=>void copy(curl,"curl")}>{copied==="curl"?t.copied:t.copy}</button></Disclosure>
         <Disclosure title="Python · urllib"><p>{t.pythonHint}</p><pre className="network-code">{python}</pre><button className="btn" onClick={()=>void copy(python,"python")}>{copied==="python"?t.copied:t.copy}</button></Disclosure>
       </Disclosure>
-      <Disclosure title={t.android}><p>{text("Webhook 填入复制的接收链接。选择 POST 表单，参数为 device_name=Android&from=[from]&content=[content]；也可使用 GET，将同样参数追加到链接并由发送器编码。","Use the copied URL. POST form: device_name=Android&from=[from]&content=[content]. GET is also supported; URL-encode the message parameters.")}</p></Disclosure>
+      <Disclosure title={t.android}><p>{text("Webhook 填入“仅复制接口地址”的链接（不带示例正文）。选择 POST 表单，参数为 device_name=Android&from=[from]&content=[content]；也可使用 GET，将同样参数追加到链接并由发送器编码。","Use the copied URL. POST form: device_name=Android&from=[from]&content=[content]. GET is also supported; URL-encode the message parameters.")}</p></Disclosure>
       <Disclosure title={t.ios}><p>{text("信息自动化 → 获取 URL 内容 → POST JSON。URL 填入接收链接，字典填写 body、sender、device_name，无需额外鉴权头。立即运行、锁屏和网络权限需按 iOS 版本验证。","Message automation → Get Contents of URL → POST JSON. Use the receiver URL and dictionary fields body, sender and device_name; no extra auth header is needed. Test lock-screen behavior and permissions on your iOS version.")}</p></Disclosure><p className="hint-text">{t.publicHint}</p>
     </Disclosure>
     {(error||status?.error)&&<p className="bad-text" role="alert">{error||status?.error}</p>}

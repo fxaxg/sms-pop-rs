@@ -1,3 +1,4 @@
+import { usePlatform } from "../../shared/platform";
 import { useEffect, useState } from "react";
 import { getSettingsMeta, openProjectLink, type ProjectLink } from "../../shared/api";
 import { Icon } from "../../shared/Icon";
@@ -13,6 +14,7 @@ function Badge({ src, label }: { src: string; label: string }) {
 
 export function About({ beforeInstall }: { beforeInstall: () => Promise<void> }) {
   const t = useT();
+  const platform=usePlatform();
   const [version, setVersion] = useState("…");
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -44,9 +46,9 @@ export function About({ beforeInstall }: { beforeInstall: () => Promise<void> })
         </button>
       </div>
     </section>
-    <section className="about-update" aria-label={t.updater.title}>
+    {platform.os !== "macos" && <section className="about-update" aria-label={t.updater.title}>
       <SoftwareUpdate beforeInstall={beforeInstall} compact />
-    </section>
+    </section>}
     <section className="about-community" aria-label={t.about.contributors}>
       <div className="about-community-heading"><h2>{t.about.contributors}</h2></div>
       <div className="about-contributors">

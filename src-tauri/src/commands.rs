@@ -14,7 +14,9 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use crate::devices::ManagedDevicePayload;
 use crate::state::AppState;
 use crate::types::{CaretLayout, LinkStatePayload, ToastPayload};
-use crate::{caret, link_worker, paths, popups, tray};
+#[cfg(windows)]
+use crate::{caret, link_worker};
+use crate::{paths, popups, tray};
 
 // ── 设置窗口 ──────────────────────────────────────────────────
 
@@ -104,21 +106,11 @@ pub fn open_logs_dir(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub fn open_bluetooth_settings() -> Result<(), String> {
-    std::process::Command::new("cmd")
-        .args(["/c", "start", "ms-settings:bluetooth"])
-        .spawn()
-        .map_err(|error| format!("打开蓝牙设置失败：{error}"))?;
-
-    Ok(())
+    crate::platform::open_bluetooth()
 }
 
 fn open_in_explorer(path: &std::path::Path) -> Result<(), String> {
-    std::process::Command::new("explorer")
-        .arg(path)
-        .spawn()
-        .map_err(|error| format!("打开资源管理器失败：{error}"))?;
-
-    Ok(())
+    crate::platform::open_path(path)
 }
 
 /// 仅允许设置窗口打开固定项目链接，不接受前端传入任意 URL 或命令。
@@ -181,6 +173,7 @@ pub fn set_preferred_device(app: AppHandle, id: String) -> Result<(), String> {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .set_preferred(&id)?;
+    #[cfg(windows)]
     link_worker::emit_devices(&app);
     Ok(())
 }
@@ -192,6 +185,7 @@ pub fn set_device_enabled(app: AppHandle, id: String, enabled: bool) -> Result<(
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .set_enabled(&id, enabled)?;
+    #[cfg(windows)]
     link_worker::emit_devices(&app);
     Ok(())
 }
@@ -203,6 +197,7 @@ pub fn forget_device(app: AppHandle, id: String) -> Result<(), String> {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .forget(&id)?;
+    #[cfg(windows)]
     link_worker::emit_devices(&app);
     Ok(())
 }
@@ -239,7 +234,7 @@ pub fn send_test_notification_from(app: AppHandle) {
         );
 
         info!("发送测试通知");
-        link_worker::dispatch_notification(&app, notification);
+        crate::notification_dispatch::dispatch_notification(&app, notification);
     });
 }
 
@@ -346,17 +341,31 @@ pub fn get_caret_offer(state: State<'_, AppState>) -> Option<(u64, String, u32, 
 
 #[tauri::command]
 pub fn caret_layout(app: AppHandle, layout: CaretLayout) {
+    #[cfg(windows)]
     caret::layout(&app, layout);
+    #[cfg(not(windows))]
+    let _ = (app, layout);
 }
 
 #[tauri::command]
 pub fn caret_insert(app: AppHandle, generation: u64) -> Option<(bool, String)> {
-    caret::insert(&app, generation)
+    #[cfg(windows)]
+    {
+        caret::insert(&app, generation)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, generation);
+        Some((false, "Use the macOS shortcut or copy".into()))
+    }
 }
 
 #[tauri::command]
 pub fn caret_hide(app: AppHandle, generation: u64) {
+    #[cfg(windows)]
     caret::hide_if_generation(&app, generation);
+    #[cfg(not(windows))]
+    let _ = (app, generation);
 }
 
 // ── 主窗口行为 ────────────────────────────────────────────────

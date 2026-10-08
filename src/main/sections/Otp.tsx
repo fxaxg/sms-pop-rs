@@ -1,3 +1,5 @@
+import { usePlatform } from "../../shared/platform";
+import { MacInput } from "./MacInput";
 import type { Config, InsertMode } from "../../shared/api";
 import { useT } from "../../shared/i18n";
 import { Disclosure, NumberField, Row, Section, Toggle } from "../components";
@@ -11,6 +13,7 @@ interface Props {
 export function Otp({ config, update }: Props) {
   const t = useT();
   const otp = config.otp;
+  const platform=usePlatform();
 
   return (
     <>
@@ -29,6 +32,8 @@ export function Otp({ config, update }: Props) {
         </Row>
       </Section>
 
+      {platform.shortcut && <MacInput />}
+      {platform.caret && <>
       <Section title={t.otp.caretTitle} description={t.ui.caretHint} action={
           <Toggle
             checked={otp.caret.enabled}
@@ -93,6 +98,7 @@ export function Otp({ config, update }: Props) {
         )}
         </fieldset>
       </Disclosure>
+      </>}
     </>
   );
 }

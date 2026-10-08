@@ -13,15 +13,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-log = "2"
 
 smspop-core = { path = "../crates/smspop-core" }
-smspop-ble = { path = "../crates/smspop-ble" }
-smspop-uia = { path = "../crates/smspop-uia" }
 
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -35,7 +33,11 @@ serde_urlencoded = "0.7"
 tower = { version = "0.5.3", features = ["limit", "util"] }
 if-addrs = "0.14"
 
-[dependencies.windows]
+[target.'cfg(windows)'.dependencies]
+smspop-ble = { path = "../crates/smspop-ble" }
+smspop-uia = { path = "../crates/smspop-uia" }
+
+[target.'cfg(windows)'.dependencies.windows]
 workspace = true
 features = [
     "Win32_Security_Cryptography",
@@ -45,3 +47,7 @@ features = [
     "Win32_UI_HiDpi",
     "Win32_UI_Shell",
 ]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3"
+tauri-plugin-global-shortcut = "2"

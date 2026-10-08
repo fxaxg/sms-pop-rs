@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+import { PlatformContext, usePlatform, type PlatformCapabilities } from "../shared/platform";
 import { useEffect, useRef, useState } from "react";
 import { getConfig, saveConfig, type Config } from "../shared/api";
 import { LangContext, resolveLang, useT } from "../shared/i18n";
@@ -24,6 +26,7 @@ const NAV_ICONS: Record<Page, IconName> = {
 };
 
 export function App() {
+  const [platform,setPlatform] = useState<PlatformCapabilities>({os:"unknown",ble:false,caret:false,shortcut:false});
   const [page, setPage] = useState<Page>("connection");
   const [config, setConfig] = useState<Config | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -57,9 +60,11 @@ export function App() {
 
   useEffect(() => {
     let disposed = false;
-    getConfig()
-      .then((loaded) => {
+    Promise.all([getConfig(),invoke<PlatformCapabilities>("get_platform_capabilities")])
+      .then(([loaded,capabilities]) => {
         if (disposed) return;
+        setPlatform(capabilities);
+        if(capabilities.os === "macos") setPage("network");
         configRef.current = loaded;
         setConfig(loaded);
       })
@@ -81,6 +86,7 @@ export function App() {
   const lang = resolveLang(config?.general.language ?? "auto");
 
   return (
+    <PlatformContext.Provider value={platform}>
     <LangContext.Provider value={lang}>
       <Shell
         page={page}
@@ -95,6 +101,7 @@ export function App() {
         beforeInstall={() => autosave.flushBeforeExit()}
       />
     </LangContext.Provider>
+    </PlatformContext.Provider>
   );
 }
 
@@ -111,6 +118,7 @@ function Shell(props: {
   beforeInstall: () => Promise<void>;
 }) {
   const t = useT();
+  const platform=usePlatform();
   const { page, setPage, config, update, saveStatus, saveError, error, retry, beforeClose } = props;
 
   const nav: { key: Page; label: string }[] = [
@@ -128,7 +136,7 @@ function Shell(props: {
       <div className="layout">
       <aside className="sidebar">
         <nav aria-label={t.shell.navigation}>
-          {nav.map((item) => (
+          {nav.filter(item=>item.key!=="connection"||platform.ble).map((item) => (
             <button
               key={item.key}
               className={`nav-item ${page === item.key ? "active" : ""}`}

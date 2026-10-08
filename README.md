@@ -1,3 +1,5 @@
+> **本地 macOS 适配分支**：Android + Mac 同一 Wi-Fi 接收与快捷键填入见 [配置指南](docs/android-macos-lan.md)。下文保留上游 Windows 项目说明。
+
 <div align="center">
   <img src="src/shared/app-icon.svg" width="112" height="112" alt="SmsPop logo" />
   <h1>SmsPop</h1>

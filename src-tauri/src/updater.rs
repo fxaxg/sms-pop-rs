@@ -28,7 +28,7 @@ impl Default for UpdateState {
     fn default() -> Self {
         Self {
             status: Mutex::new(UpdateStatus {
-                phase: if cfg!(debug_assertions) {
+                phase: if cfg!(any(debug_assertions, target_os = "macos")) {
                     "disabled"
                 } else {
                     "idle"
@@ -62,7 +62,7 @@ fn failure(app: &AppHandle, phase: &str, error: String) -> String {
 }
 
 fn enabled() -> Result<(), String> {
-    if cfg!(debug_assertions) {
+    if cfg!(any(debug_assertions, target_os = "macos")) {
         Err("Updates are disabled in development builds".into())
     } else {
         Ok(())
@@ -236,7 +236,7 @@ pub async fn install_update(window: tauri::WebviewWindow, app: AppHandle) -> Res
 }
 
 pub fn start(app: AppHandle) {
-    if cfg!(debug_assertions) {
+    if cfg!(any(debug_assertions, target_os = "macos")) {
         return;
     }
     tauri::async_runtime::spawn(async move {
@@ -254,7 +254,7 @@ mod tests {
         let state = UpdateState::default();
         assert_eq!(
             state.status.lock().unwrap().phase,
-            if cfg!(debug_assertions) {
+            if cfg!(any(debug_assertions, target_os = "macos")) {
                 "disabled"
             } else {
                 "idle"
@@ -262,7 +262,10 @@ mod tests {
         );
         assert!(state.update.lock().unwrap().is_none());
         assert!(state.bytes.lock().unwrap().is_none());
-        assert_eq!(enabled().is_err(), cfg!(debug_assertions));
+        assert_eq!(
+            enabled().is_err(),
+            cfg!(any(debug_assertions, target_os = "macos"))
+        );
     }
 
     #[test]

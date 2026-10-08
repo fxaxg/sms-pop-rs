@@ -53,6 +53,15 @@ impl Default for GeneralOptions {
 }
 
 impl Config {
+    /// Defaults only for creating a new config; loading preserves user choices.
+    pub fn initial_for_platform(macos: bool) -> Self {
+        let mut config = Self::default();
+        if macos {
+            config.otp.auto_copy = false;
+        }
+        config
+    }
+
     /// 这条通知是否通过 App / 关键词过滤。
     pub fn passes_filter(&self, notification: &PhoneNotification) -> bool {
         NotificationFilter::new(self.notifications.filter.clone()).passes(notification)
@@ -606,5 +615,23 @@ mod tests {
     fn 文件不存在时返回默认而不是报错() {
         let config = Config::load_or_default("这个路径肯定不存在/config.json").unwrap();
         assert_eq!(config, Config::default());
+    }
+}
+
+#[cfg(test)]
+mod macos_defaults_tests {
+    use super::*;
+    #[test]
+    fn macos_initial_defaults_disable_automatic_copy() {
+        assert!(!Config::initial_for_platform(true).otp.auto_copy);
+        assert!(Config::initial_for_platform(false).otp.auto_copy);
+    }
+    #[test]
+    fn explicit_copy_preference_survives_reload() {
+        let mut config = Config::initial_for_platform(true);
+        config.otp.auto_copy = true;
+        let loaded: Config =
+            serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+        assert!(loaded.otp.auto_copy);
     }
 }
