@@ -285,6 +285,7 @@ pub fn get_toast_payload(
     window: tauri::WebviewWindow,
     state: State<'_, AppState>,
 ) -> Option<ToastPayload> {
+    info!("通知前端请求负载: {}", window.label());
     state
         .pending_toasts
         .lock()
