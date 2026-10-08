@@ -84,8 +84,8 @@ pub fn run() {
                     }
                 });
 
-                // 首次运行 → 打开主窗口（默认落在「连接引导」页）
-                if first_run {
+                // Mac 打开应用时显示设置；Windows 保留首次运行引导行为。
+                if first_run || cfg!(target_os = "macos") {
                     let _ = main_window.show();
                     let _ = main_window.set_focus();
                 }
@@ -187,6 +187,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("构建 Tauri 应用失败")
         .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                tray::open_main_window(app);
+            }
             if let tauri::RunEvent::Exit = event {
                 http_ingress::stop(app);
                 app.state::<AppState>()

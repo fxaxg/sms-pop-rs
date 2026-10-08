@@ -15,14 +15,14 @@
 3. 通过“网卡”选择手机能访问的 Mac IPv4 地址，通常为 `192.168.*` 或 `10.*`。不要选择 `127.0.0.1`、`169.254.*` 或不通的 VPN 地址。
 4. 点击 **仅复制接口地址**。它包含随机鉴权令牌，不要把链接发到群聊或公开截图中。
 5. 在 [SmsForwarder](https://github.com/pppscn/SmsForwarder) 创建 Webhook 发送通道，填入该地址，方法为 POST，Content-Type 为 `application/x-www-form-urlencoded`。
-6. 表单参数填写：
+6. 在 `webParams / 请求参数` 中填写（不要留空，否则发送器会附加本接口不支持的字段）：
 
    ```text
    device_name=Android&from=[from]&content=[content]
    ```
 
-   应使用发送器的表单字段/编码功能，确保中文、`&`、`+` 与换行被正确编码。界面和占位符以所安装的 SmsForwarder 版本为准。不要把带“通知正文”示例参数的 GET 测试链接用于 POST。
-7. 建立短信转发规则并绑定上述通道；授予短信权限和该手机系统需要的后台运行权限。
+   SmsForwarder 会对此格式自动进行表单编码并设置 Content-Type。`secret / 签名密钥` 留空。界面名称以所安装版本为准。不要把带“通知正文”示例参数的 GET 测试链接用于 POST。参见 [官方 Webhook 说明](https://github.com/pppscn/SmsForwarder/wiki/附录1：向webhook发送post-get-put-patch请求)。
+7. 建立短信转发规则，条件可先设为“内容包含：验证码”，绑定上述通道并启用；授予短信权限和该手机系统需要的后台运行权限。
 8. 先发送一条测试短信，再使用真实收到的验证码检查：Mac 显示通知，点击验证码可以复制。
 
 也可以把不带 token 的接口地址与 `Authorization: Bearer YOUR_TOKEN` 请求头组合使用。凭据只能放在请求头、URL 或请求体三者之一，重复会被拒绝。

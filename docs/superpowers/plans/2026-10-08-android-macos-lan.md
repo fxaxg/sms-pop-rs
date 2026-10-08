@@ -1,5 +1,7 @@
 # Android → macOS LAN Implementation Plan
 
+> 执行状态（2026-10-08）：任务 1–5 的实现已集成提交，任务 6 的文档、CI、自动验证和审查修复已完成；正在协助用户配置手机。原计划清单含实现与手工验收混合步骤，不整体勾选。实际完成证据、实现取舍及未验证项目见 [验收记录](../../macos-verification.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans for inline execution, or superpowers:subagent-driven-development if the user selects delegation. Steps use checkbox syntax for tracking.
 
 **Goal:** 安卓通过 SmsForwarder 向同一局域网的 Mac 发送验证码，Mac 提示、复制并支持用户按快捷键填入。

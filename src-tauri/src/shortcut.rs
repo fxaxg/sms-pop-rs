@@ -35,21 +35,32 @@ fn publish(app: &AppHandle, result: Result<(), String>) {
     *app.state::<ShortcutStateData>().error.lock().unwrap() = message.clone();
     let text = message.unwrap_or_else(|| "已发送填入指令；若目标未接受，请手动复制".into());
     let _ = app.emit("input-result", text.clone());
-    crate::popups::show(
-        app,
-        &smspop_core::model::PhoneNotification {
-            device_id: "local-feedback".into(),
-            device_name: Some("SmsPop".into()),
-            uid: 0,
-            app_identifier: None,
-            title: Some("SmsPop · 填入状态".into()),
-            subtitle: None,
-            message: Some(text),
-            code: None,
-            received_at: std::time::SystemTime::now(),
-        },
+    let state = app.state::<AppState>();
+    let notification = feedback(
+        text,
+        &mut state.otp_candidate.lock().unwrap(),
+        Instant::now(),
     );
+    crate::popups::show(app, &notification);
 }
+fn feedback(
+    text: String,
+    candidate: &mut smspop_core::otp_candidate::OtpCandidateStore,
+    now: Instant,
+) -> smspop_core::model::PhoneNotification {
+    smspop_core::model::PhoneNotification {
+        device_id: "local-feedback".into(),
+        device_name: Some("SmsPop".into()),
+        uid: 0,
+        app_identifier: None,
+        title: Some("SmsPop · 填入状态".into()),
+        subtitle: None,
+        message: Some(text),
+        code: candidate.current(now).map(str::to_owned),
+        received_at: std::time::SystemTime::now(),
+    }
+}
+
 pub fn configure(app: &AppHandle, accelerator: &str) -> Result<(), String> {
     let shortcut: Shortcut = accelerator
         .parse()
@@ -179,4 +190,30 @@ pub fn set_input_shortcut(
         return Err("快捷键保存失败，已尝试恢复原快捷键".into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn failed_insertion_feedback_exposes_only_unexpired_candidate() {
+        let mut candidate = smspop_core::otp_candidate::OtpCandidateStore::default();
+        let now = Instant::now();
+        candidate.offer("123456".into(), now);
+        assert_eq!(
+            feedback("Not editable".into(), &mut candidate, now)
+                .code
+                .as_deref(),
+            Some("123456")
+        );
+        assert_eq!(
+            feedback(
+                "Expired".into(),
+                &mut candidate,
+                now + std::time::Duration::from_secs(120)
+            )
+            .code,
+            None
+        );
+    }
 }

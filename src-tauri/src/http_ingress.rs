@@ -69,6 +69,22 @@ struct Inner {
     rate: (Instant, u32),
     seq: u32,
 }
+/// Losing access to the credential closes the listener and invalidates in-flight work.
+fn receiver_token(inner: &mut Inner) -> Result<String, String> {
+    match crate::token_store::load(&inner.settings.encrypted_token) {
+        Ok(token) => Ok(token),
+        Err(error) => {
+            inner.settings.enabled = false;
+            inner.running = false;
+            inner.generation = inner.generation.wrapping_add(1);
+            inner.error = Some(error.clone());
+            if let Some(shutdown) = inner.shutdown.take() {
+                let _ = shutdown.send(());
+            }
+            Err(error)
+        }
+    }
+}
 pub struct HttpIngress {
     inner: Arc<Mutex<Inner>>,
     operation: tokio::sync::Mutex<()>,
@@ -184,13 +200,14 @@ impl HttpIngress {
 pub fn get_http_status(window: tauri::WebviewWindow, app: AppHandle) -> Result<Status, String> {
     main_only(&window)?;
     let state = app.state::<HttpIngress>();
-    let inner = state.inner.lock().unwrap();
+    let mut inner = state.inner.lock().unwrap();
+    let token = receiver_token(&mut inner).ok();
     let mut settings = inner.settings.clone();
     for d in &mut settings.devices {
         d.token_hash.clear();
     }
     Ok(Status {
-        token: crate::token_store::load(&inner.settings.encrypted_token).ok(),
+        token,
         settings,
         running: inner.running,
         error: inner.error.clone(),
@@ -312,8 +329,8 @@ async fn receive(State(server): State<Server>, request: Request) -> Response {
         return reply(StatusCode::UNAUTHORIZED, "provide_one_token");
     }
     let device = {
-        let i = server.inner.lock().unwrap();
-        let token = crate::token_store::load(&i.settings.encrypted_token).ok();
+        let mut i = server.inner.lock().unwrap();
+        let token = receiver_token(&mut i).ok();
         if token.as_deref() != Some(tokens[0].as_str()) || tokens[0].is_empty() {
             return reply(StatusCode::UNAUTHORIZED, "unauthorized");
         }
@@ -334,7 +351,7 @@ async fn receive(State(server): State<Server>, request: Request) -> Response {
     // 在读取 body 期间被撤销的令牌不能继续入队。
     if !i.settings.enabled
         || i.generation != server.generation
-        || crate::token_store::load(&i.settings.encrypted_token)
+        || receiver_token(&mut i)
             .ok()
             .is_none_or(|token| hash(&token) != device.token_hash)
     {
@@ -401,7 +418,7 @@ async fn launch(app: AppHandle) -> Result<(), String> {
     if !matches!(settings.bind.as_str(), "127.0.0.1" | "0.0.0.0") || settings.port == 0 {
         return Err("Invalid bind address or port".into());
     }
-    crate::token_store::load(&settings.encrypted_token)?;
+    receiver_token(&mut state.inner.lock().unwrap())?;
     let listener = tokio::net::TcpListener::bind((settings.bind.as_str(), settings.port))
         .await
         .map_err(|e| format!("Listener unavailable: {e}"))?;
@@ -413,10 +430,10 @@ async fn launch(app: AppHandle) -> Result<(), String> {
             // 执行前再确认设备仍存在且未被撤销。
             let current = {
                 let s = worker_app.state::<HttpIngress>();
-                let i = s.inner.lock().unwrap();
+                let mut i = s.inner.lock().unwrap();
                 if i.settings.enabled
                     && i.generation == generation
-                    && crate::token_store::load(&i.settings.encrypted_token)
+                    && receiver_token(&mut i)
                         .ok()
                         .is_some_and(|token| hash(&token) == device.token_hash)
                 {
@@ -487,7 +504,7 @@ pub async fn configure_http(
         let mut i = state.inner.lock().unwrap();
         let mut next = i.settings.clone();
         if enabled {
-            crate::token_store::load(&next.encrypted_token)?;
+            receiver_token(&mut i)?;
         }
         next.enabled = enabled;
         next.bind = bind;
@@ -763,5 +780,35 @@ mod tests {
                 StatusCode::ACCEPTED
             );
         });
+    }
+}
+
+#[cfg(test)]
+mod runtime_credential_tests {
+    use super::*;
+    #[test]
+    fn credential_loss_disables_invalidates_and_stops_listener() {
+        let (shutdown, mut stopped) = oneshot::channel();
+        let mut inner = Inner {
+            generation: 4,
+            settings: Settings {
+                enabled: true,
+                encrypted_token: b"missing-account".to_vec(),
+                ..Default::default()
+            },
+            running: true,
+            error: None,
+            shutdown: Some(shutdown),
+            stopped: None,
+            seen: HashMap::new(),
+            rate: (Instant::now(), 0),
+            seq: 0,
+        };
+        assert!(receiver_token(&mut inner).is_err());
+        assert!(!inner.running);
+        assert!(!inner.settings.enabled);
+        assert_eq!(inner.generation, 5);
+        assert!(inner.error.is_some());
+        assert!(stopped.try_recv().is_ok());
     }
 }
