@@ -13,7 +13,7 @@ use tauri::AppHandle;
 
 use crate::devices::DeviceRegistry;
 use crate::paths;
-use crate::types::{CaretOffer, ToastPayload};
+use crate::types::ToastPayload;
 
 pub struct AppState {
     /// 当前生效的配置（设置界面保存后整体替换）。
@@ -60,11 +60,8 @@ pub struct AppState {
     /// 托盘「开机自启」勾选项（切换时要同步它的勾选状态）。
     pub autostart_item: Mutex<Option<tauri::menu::CheckMenuItem<tauri::Wry>>>,
 
-    /// 当前生效的候选条提议。
-    pub caret_offer: Mutex<Option<CaretOffer>>,
-
-    /// 候选条提议代数。
-    pub caret_generation: AtomicU64,
+    /// 候选会话、目标与写入认领在同一把锁下更新。
+    pub caret: Mutex<crate::caret::CaretState>,
 }
 
 impl AppState {
@@ -105,8 +102,7 @@ impl AppState {
             toast_heights: Mutex::new(HashMap::new()),
             toast_seq: AtomicU64::new(0),
             autostart_item: Mutex::new(None),
-            caret_offer: Mutex::new(None),
-            caret_generation: AtomicU64::new(0),
+            caret: Mutex::new(crate::caret::CaretState::default()),
         }
     }
 
@@ -120,11 +116,15 @@ impl AppState {
 
     /// 替换配置；如果填入方式变了，顺带重启 UIA 工作线程让新配置生效。
     pub fn apply_config(&self, config: Config) {
-        let old = self.config();
         let mut guard = self
             .config
             .write()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let old = guard.clone();
+        // Same lock order as watch(): no old-config session can start after cancellation.
+        if old.otp != config.otp {
+            self.caret.lock().unwrap().cancel();
+        }
         *guard = config.clone();
         drop(guard);
 

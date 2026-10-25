@@ -17,8 +17,7 @@
 //! * `typed` —— 用模拟键盘逐字键入时**只需要敲的字符**
 //!   （补全时只敲缺的那几位；追加时就是整段验证码）
 //!
-//! 纯函数，可单测。项目里没有任何自动路径会调用它 ——
-//! 只有用户真的点了候选条，才会走到这里。
+//! 手动写入使用 [`plan`]；显式开启的自动写入只能使用更保守的 [`plan_automatic`]。
 
 /// 写入决策。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,9 +111,47 @@ pub fn plan(current_value: Option<&str>, code: Option<&str>) -> InsertionPlan {
     InsertionPlan::write(format!("{current_value}{code}"), code, "追加到已有内容后面")
 }
 
+/// 自动填入不盲写、不追加普通文本；密码/只读/焦点检查由 UIA 执行层负责。
+pub fn plan_automatic(current_value: Option<&str>, code: Option<&str>) -> InsertionPlan {
+    let Some(current) = current_value else {
+        return InsertionPlan::do_not_touch("无法读取输入框，跳过自动填入");
+    };
+    let Some(code) = code.filter(|code| !code.is_empty()) else {
+        return InsertionPlan::do_not_touch("没有可用的验证码");
+    };
+    let trimmed = current.trim();
+    if !trimmed.is_empty() && (trimmed == code || !code.starts_with(trimmed)) {
+        return InsertionPlan::do_not_touch("自动填入仅处理空白或验证码前缀");
+    }
+    plan(Some(current), Some(code))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn 自动只填已知空白或补全验证码前缀() {
+        for current in [
+            None,
+            Some("hello"),
+            Some("123456"),
+            Some("abc123456"),
+            Some("1234567"),
+        ] {
+            assert!(!plan_automatic(current, Some("123456")).should_write());
+        }
+        assert!(!plan_automatic(Some(""), None).should_write());
+        for current in ["", " \t", "123"] {
+            let result = plan_automatic(Some(current), Some("123456"));
+            assert!(result.should_write());
+            assert_eq!(result.value.as_deref(), Some("123456"));
+        }
+        assert_eq!(
+            plan_automatic(Some("123"), Some("123456")).typed.as_deref(),
+            Some("456")
+        );
+    }
 
     fn reason_of(current: Option<&str>, code: Option<&str>) -> String {
         plan(current, code).reason

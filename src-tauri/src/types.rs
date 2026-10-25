@@ -59,8 +59,11 @@ pub struct ToastPayload {
 /// 当前生效的候选条提议。
 #[derive(Debug, Clone)]
 pub struct CaretOffer {
+    pub session_id: u64,
     /// 单调递增的代数 —— 防止迟到的布局/隐藏请求误伤新提议。
     pub generation: u64,
+    pub target_id: u64,
+    pub expires: std::time::Instant,
     pub code: String,
     pub source_hint: Option<String>,
     /// 光标矩形（DIP）。

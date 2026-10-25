@@ -117,6 +117,7 @@ pub fn run() {
             commands::caret_layout,
             commands::caret_insert,
             commands::caret_hide,
+            commands::caret_dismiss,
             commands::open_main_window,
         ])
         .build(tauri::generate_context!())

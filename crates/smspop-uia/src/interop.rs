@@ -47,6 +47,15 @@ pub fn focus_context() -> FocusContext {
     }
 }
 
+pub fn foreground_is_ours() -> bool {
+    let hwnd = unsafe { GetForegroundWindow() };
+    let mut pid = 0;
+    unsafe {
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    }
+    pid == std::process::id()
+}
+
 /// 前台窗口的类名。
 fn class_name(hwnd: HWND) -> Option<String> {
     let mut buffer = [0u16; 256];

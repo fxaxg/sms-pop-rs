@@ -3,10 +3,10 @@ name = "smspop-uia"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "SmsPop 的焦点探测与写入：UIA 探输入框 + 点击后填入"
+description = "SmsPop 的焦点探测与写入：手动候选条与可选自动填入"
 
 # ★ 这个 crate 里有整个项目**唯一**会改动别人内容的地方（`insert`）。
-#   它只被候选条的鼠标点击调用，没有任何自动路径。
+#   默认点击候选条触发；自动路径需用户显式开启，且每条验证码最多尝试一次。
 #
 # ★ 线程模型：UIA 的 COM 接口**绝不跨线程**。
 #   这里有一个专属工作线程，它：

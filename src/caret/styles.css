@@ -16,10 +16,11 @@ body {
 }
 
 .pill {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 14px;
-  padding: 5px 5px 5px 12px;
+  padding: 5px 25px 5px 12px;
   min-height: 38px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -88,6 +89,9 @@ body {
 .pill.inserting .pill-action { color: var(--text-secondary); }
 .pill.done .pill-action { background: transparent; color: var(--success); }
 .pill.failed .pill-action { background: transparent; color: var(--danger); }
+.pill-close { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border: 0; border-radius: 4px; padding: 0; background: transparent; color: var(--text-secondary); font-size: 15px; line-height: 20px; cursor: pointer; }
+.pill-close:hover { background: var(--surface-hover); color: var(--text); }
+.pill-close:focus-visible { outline-offset: 0; }
 
 .sr-only {
   position: absolute;

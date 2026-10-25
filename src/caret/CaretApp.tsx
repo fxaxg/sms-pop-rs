@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   caretHide,
+  caretDismiss,
   caretInsert,
   caretLayout,
   getCaretOffer,
@@ -48,13 +49,20 @@ export function CaretApp() {
   }, []);
 
   useEffect(() => {
-    refresh();
-    const unlisten = onCaretOffer(refresh);
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    void (async () => {
+      const unlisten = await onCaretOffer(refresh);
+      if (disposed) { unlisten(); return; }
+      stop = unlisten;
+      await refresh();
+    })().catch(() => {});
     return () => {
+      disposed = true;
       ++refreshVersion.current;
       generationRef.current = null;
       if (hideTimer.current) clearTimeout(hideTimer.current);
-      unlisten.then((fn) => fn());
+      stop?.();
     };
   }, [refresh]);
 
@@ -81,7 +89,7 @@ export function CaretApp() {
   if (!offer) return null;
 
   const t = dict(lang);
-  const [generation, code, , sourceHint] = offer;
+  const [generation, code, , sourceHint, sessionId] = offer;
 
   const onInsert = async () => {
     if (phase !== "ready") return;
@@ -120,6 +128,14 @@ export function CaretApp() {
           </span>
         ))}
       </button>
+      <button className="pill-close" aria-label={t.caret.dismiss} title={t.caret.dismiss}
+        onClick={() => {
+          generationRef.current = null;
+          ++refreshVersion.current;
+          if (hideTimer.current) clearTimeout(hideTimer.current);
+          setOffer(null);
+          void caretDismiss(sessionId).catch(() => {});
+        }}>×</button>
       <span className="sr-only" role="status">{phase === "ready" ? "" : phase === "inserting" ? t.caret.filling : phase === "done" ? t.caret.done : t.caret.failed}</span>
     </div>
   );
