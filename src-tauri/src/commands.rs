@@ -95,7 +95,7 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<bool, String> {
 
 #[tauri::command]
 pub fn open_config_dir(app: AppHandle) -> Result<(), String> {
-    open_in_explorer(&paths::config_path(&app))
+    open_in_explorer(&paths::data_dir(&app))
 }
 
 #[tauri::command]
