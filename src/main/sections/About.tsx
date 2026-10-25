@@ -4,6 +4,7 @@ import { Icon } from "../../shared/Icon";
 import { useT } from "../../shared/i18n";
 import appIcon from "../../shared/app-icon.svg";
 import { SoftwareUpdate } from "./SoftwareUpdate";
+import type { Updater } from "../useUpdater";
 
 function Badge({ src, label }: { src: string; label: string }) {
   const [failed, setFailed] = useState(false);
@@ -11,7 +12,7 @@ function Badge({ src, label }: { src: string; label: string }) {
     : <img className="about-badge" src={src} alt={label} referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
 }
 
-export function About({ beforeInstall }: { beforeInstall: () => Promise<void> }) {
+export function About({ updater }: { updater: Updater }) {
   const t = useT();
   const [version, setVersion] = useState("…");
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +46,7 @@ export function About({ beforeInstall }: { beforeInstall: () => Promise<void> })
       </div>
     </section>
     <section className="about-update" aria-label={t.updater.title}>
-      <SoftwareUpdate beforeInstall={beforeInstall} compact />
+      <SoftwareUpdate updater={updater} />
     </section>
     <section className="about-community" aria-label={t.about.contributors}>
       <div className="about-community-heading"><h2>{t.about.contributors}</h2></div>
