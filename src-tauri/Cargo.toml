@@ -26,7 +26,7 @@ smspop-uia = { path = "../crates/smspop-uia" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["time", "sync", "macros"] }
 tauri-plugin-updater = "2"
 axum = "0.8"
 sha2 = "0.10"
@@ -34,6 +34,9 @@ uuid = { version = "1", features = ["v4"] }
 serde_urlencoded = "0.7"
 tower = { version = "0.5.3", features = ["limit", "util"] }
 if-addrs = "0.14"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util", "rt"] }
 
 [dependencies.windows]
 workspace = true
