@@ -11,6 +11,8 @@ import { Icon, type IconName } from "../shared/Icon";
 import { applyTheme } from "../shared/theme";
 import { AutoSave, type SaveStatus } from "../shared/autosave";
 import { Titlebar } from "./Titlebar";
+import { useUpdater } from "./useUpdater";
+import { UpdateNotice, UpdateDialog } from "./sections/SoftwareUpdate";
 
 type Page = "connection" | "network" | "notifications" | "otp" | "general" | "about";
 
@@ -111,6 +113,7 @@ function Shell(props: {
   beforeInstall: () => Promise<void>;
 }) {
   const t = useT();
+  const updater = useUpdater();
   const { page, setPage, config, update, saveStatus, saveError, error, retry, beforeClose } = props;
 
   const nav: { key: Page; label: string }[] = [
@@ -141,6 +144,7 @@ function Shell(props: {
           ))}
         </nav>
         <div className="sidebar-caption">
+          <UpdateNotice updater={updater} />
           <div className={`autosave-status ${saveStatus === "error" ? "bad-text" : ""}`} role="status">
             {saveStatus === "idle" ? t.common.autoSave : saveStatus === "saved" ? t.common.saved : saveStatus === "error" ? t.common.saveFailed : t.common.saving}
           </div>
@@ -166,13 +170,14 @@ function Shell(props: {
             {page === "notifications" && <Notifications config={config} update={update} />}
             {page === "otp" && <Otp config={config} update={update} />}
             {page === "general" && <General config={config} update={update} />}
-            {page === "about" && <About beforeInstall={props.beforeInstall} />}
+            {page === "about" && <About updater={updater} />}
           </>
         ) : (
           <p className="loading">{t.common.loading}</p>
         )}
       </main>
       </div>
+      {updater.open && <UpdateDialog updater={updater} beforeInstall={props.beforeInstall} />}
     </div>
   );
 }
