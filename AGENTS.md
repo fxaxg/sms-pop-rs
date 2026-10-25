@@ -19,7 +19,7 @@ crates/
 src-tauri/        Tauri 主程序
 ├─ src/link_worker.rs  BLE 事件 → 应用动作（去重 → 过滤 → 复制/弹窗/候选条）
 ├─ src/popups.rs       toast 弹窗管理（动态窗口，右下堆叠，不抢焦点）
-├─ src/caret.rs        光标候选条（点了才填入）
+├─ src/caret.rs        候选条跟随与可选自动填入（默认手动）
 ├─ src/tray.rs         系统托盘
 ├─ src/commands.rs     前端命令
 └─ src/state.rs        全局状态
