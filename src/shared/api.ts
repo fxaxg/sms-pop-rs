@@ -111,11 +111,14 @@ export interface UpdateStatus {
   downloaded: number;
   total: number | null;
   error: string | null;
+  retry_attempt: number;
+  next_retry_at: number | null;
 }
 export const getUpdateStatus = () => invoke<UpdateStatus>("get_update_status");
 export const checkUpdate = () => invoke<void>("check_update");
 export const downloadUpdate = () => invoke<void>("download_update");
 export const installUpdate = () => invoke<void>("install_update");
+export const openUpdateLink = (url: string) => invoke<void>("open_update_link", { url });
 export const onUpdateStatus = (handler: (status: UpdateStatus) => void) =>
   listen<UpdateStatus>("update-status", (event) => handler(event.payload));
 

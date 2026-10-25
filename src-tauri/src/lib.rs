@@ -93,6 +93,7 @@ pub fn run() {
             updater::check_update,
             updater::download_update,
             updater::install_update,
+            updater::open_update_link,
             commands::save_config,
             commands::get_settings_meta,
             commands::set_autostart,
