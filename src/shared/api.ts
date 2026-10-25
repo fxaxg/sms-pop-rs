@@ -56,6 +56,7 @@ export interface InsertionOptions {
 export interface OtpOptions {
   enabled: boolean;
   auto_copy: boolean;
+  auto_fill: boolean;
   caret: CaretOptions;
   insertion: InsertionOptions;
 }
@@ -179,8 +180,8 @@ export const toastResize = (height: number) =>
 
 // ── 候选条窗口 ────────────────────────────────────────────────
 
-/** [generation, code, durationSecs] */
-export type CaretOfferTuple = [number, string, number, string | null];
+/** [offerGeneration, code, durationSecs, sourceHint, sessionId] */
+export type CaretOfferTuple = [number, string, number, string | null, number];
 
 export const getCaretOffer = () => invoke<CaretOfferTuple | null>("get_caret_offer");
 export const caretLayout = (generation: number, width: number, height: number) =>
@@ -188,5 +189,6 @@ export const caretLayout = (generation: number, width: number, height: number) =
 export const caretInsert = (generation: number) =>
   invoke<[boolean, string] | null>("caret_insert", { generation });
 export const caretHide = (generation: number) => invoke<void>("caret_hide", { generation });
+export const caretDismiss = (session: number) => invoke<void>("caret_dismiss", { session });
 export const onCaretOffer = (handler: () => void) =>
   listen<number>("caret-offer", () => handler());

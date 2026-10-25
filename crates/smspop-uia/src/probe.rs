@@ -26,7 +26,7 @@ pub(crate) struct ProbeResult {
     pub element: Option<IUIAutomationElement>,
 }
 
-pub(crate) fn run(automation: &IUIAutomation, mode: InsertMode) -> ProbeResult {
+pub(crate) fn run(automation: &IUIAutomation, mode: InsertMode, code: &str) -> ProbeResult {
     let element = match unsafe { automation.GetFocusedElement() } {
         Ok(element) => element,
         Err(error) => {
@@ -45,6 +45,17 @@ pub(crate) fn run(automation: &IUIAutomation, mode: InsertMode) -> ProbeResult {
     let mut supports_value = false;
     let mut is_read_only = true;
     let mut value_len = 0usize;
+    let mut current_value = None;
+    let protected_input = unsafe { element.CurrentIsPassword() }
+        .map(|v| v.as_bool())
+        .unwrap_or(true);
+    let focused = unsafe { element.CurrentHasKeyboardFocus() }
+        .map(|v| v.as_bool())
+        .unwrap_or(false);
+    let own_process = interop::foreground_is_ours()
+        || unsafe { element.CurrentProcessId() }
+            .map(|v| v as u32 == std::process::id())
+            .unwrap_or(true);
 
     match unsafe { element.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId) } {
         Ok(pattern) => {
@@ -56,9 +67,15 @@ pub(crate) fn run(automation: &IUIAutomation, mode: InsertMode) -> ProbeResult {
 
             // ★ 只取长度。内容绝不带出这个函数，也绝不进日志 ——
             //   那个框里可能是密码。
-            value_len = unsafe { pattern.CurrentValue() }
-                .map(|value| value.to_string().chars().count())
-                .unwrap_or(0);
+            if !protected_input {
+                current_value = unsafe { pattern.CurrentValue() }
+                    .ok()
+                    .map(|value| value.to_string());
+                value_len = current_value
+                    .as_ref()
+                    .map(|value| value.chars().count())
+                    .unwrap_or(0);
+            }
         }
         Err(error) => debug!("这个控件没有 ValuePattern：{error}"),
     }
@@ -78,12 +95,13 @@ pub(crate) fn run(automation: &IUIAutomation, mode: InsertMode) -> ProbeResult {
     // * direct  —— 必须有可写的 ValuePattern（这样才能整体写入）
     // * simulate —— 可写的 ValuePattern **或者** 像个可键入的文本控件都行；
     //   后者读不到当前值，追加判断会退化成"盲追加"，这是放宽门槛的代价。
-    let editable = match mode {
-        InsertMode::Direct => supports_value && !is_read_only,
-        InsertMode::Simulate => {
-            (supports_value && !is_read_only) || (supports_text && keyboard_focusable)
-        }
-    };
+    let editable = focused
+        && match mode {
+            InsertMode::Direct => supports_value && !is_read_only,
+            InsertMode::Simulate => {
+                (supports_value && !is_read_only) || (supports_text && keyboard_focusable)
+            }
+        };
 
     let skip_reason = if editable {
         None
@@ -112,6 +130,14 @@ pub(crate) fn run(automation: &IUIAutomation, mode: InsertMode) -> ProbeResult {
 
     ProbeResult {
         outcome: ProbeOutcome::Found(FocusTarget {
+            target_id: 0, // 工作线程根据 COM 元素身份填入。
+            auto_fill_eligible: editable
+                && !protected_input
+                && !own_process
+                && supports_value
+                && !is_read_only
+                && smspop_core::insertion::plan_automatic(current_value.as_deref(), Some(code))
+                    .should_write(),
             editable,
             skip_reason,
             value_len,

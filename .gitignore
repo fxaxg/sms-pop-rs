@@ -6,6 +6,7 @@ Cargo.lock.bak
 # Node / frontend
 node_modules/
 /dist
+/.cache/
 *.local
 
 # Tauri

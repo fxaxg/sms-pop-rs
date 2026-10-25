@@ -44,6 +44,7 @@ pub fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
 
     let theme = config.general.theme;
     app.state::<AppState>().apply_config(config);
+    caret::config_applied(&app);
     if let Err(error) = app.emit("theme-changed", theme) {
         warn!("广播外观设置失败：{error}");
     }
@@ -333,13 +334,16 @@ pub fn toast_resize(app: AppHandle, label: String, height: f64) {
 
 /// caret 前端加载完成后主动来取当前提议。
 #[tauri::command]
-pub fn get_caret_offer(state: State<'_, AppState>) -> Option<(u64, String, u32, Option<String>)> {
-    state.caret_offer.lock().unwrap().as_ref().map(|offer| {
+pub fn get_caret_offer(
+    state: State<'_, AppState>,
+) -> Option<(u64, String, u32, Option<String>, u64)> {
+    state.caret.lock().unwrap().offer.as_ref().map(|offer| {
         (
             offer.generation,
             offer.code.clone(),
             offer.duration_secs,
             offer.source_hint.clone(),
+            offer.session_id,
         )
     })
 }
@@ -350,13 +354,21 @@ pub fn caret_layout(app: AppHandle, layout: CaretLayout) {
 }
 
 #[tauri::command]
-pub fn caret_insert(app: AppHandle, generation: u64) -> Option<(bool, String)> {
-    caret::insert(&app, generation)
+pub async fn caret_insert(app: AppHandle, generation: u64) -> Option<(bool, String)> {
+    tauri::async_runtime::spawn_blocking(move || caret::insert(&app, generation))
+        .await
+        .ok()
+        .flatten()
 }
 
 #[tauri::command]
 pub fn caret_hide(app: AppHandle, generation: u64) {
     caret::hide_if_generation(&app, generation);
+}
+
+#[tauri::command]
+pub fn caret_dismiss(app: AppHandle, session: u64) {
+    caret::dismiss(&app, session);
 }
 
 // ── 主窗口行为 ────────────────────────────────────────────────

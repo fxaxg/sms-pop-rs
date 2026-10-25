@@ -12,6 +12,7 @@
 
 pub mod ancs;
 pub mod app_rules;
+pub mod caret;
 pub mod config;
 pub mod dedup;
 pub mod devices;
