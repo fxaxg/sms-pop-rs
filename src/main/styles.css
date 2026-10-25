@@ -497,6 +497,19 @@
 .disclosure[open] > summary { border-bottom: 1px solid var(--border); margin-bottom: 12px; }
 .modal .disclosure { padding: 0 12px; background: var(--bg); }
 .settings-fields { margin: 0; padding: 0; border: 0; min-width: 0; }
+.otp-fill-options { display: flex; gap: 3px; width: fit-content; max-width: 100%; margin: 0; padding: 3px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.otp-fill-option { position: relative; min-width: 0; cursor: pointer; }
+.otp-fill-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.otp-fill-option span { display: block; padding: 7px 14px; border-radius: 5px; color: var(--text-secondary); font-size: 13px; text-align: center; }
+.otp-fill-option:hover span { color: var(--text); background: var(--surface-hover); }
+.otp-fill-option input:checked + span { color: var(--on-accent); background: var(--accent); font-weight: 600; }
+.otp-fill-option input:focus-visible { outline: none; }
+.otp-fill-option input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 1px; }
+.otp-fill-options:disabled { opacity: .5; }
+.otp-fill-options:disabled .otp-fill-option { cursor: default; }
+.otp-fill-options:disabled .otp-fill-option:hover span { background: transparent; }
+.otp-fill-options:disabled .otp-fill-option input:checked + span { background: var(--accent); }
+.otp-fill-hint { margin: 10px 0 0; color: var(--text-secondary); font-size: 12px; }
 .settings-fields:disabled, .toggle:disabled { opacity: .5; }
 .toggle:disabled { cursor: default; }
 .local-test { margin: 8px 0 0; padding-top: 16px; gap: 16px; }
