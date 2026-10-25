@@ -10,8 +10,12 @@
 //! * 完全不用碰 COM 的跨线程接口封送。
 
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use log::{info, warn};
 use smspop_core::config::InsertMode;
@@ -25,13 +29,46 @@ use crate::{insert, probe, InsertOutcome, ProbeOutcome};
 /// 工作线程收到的活。
 enum Command {
     Probe {
+        code: String,
         reply: Sender<ProbeOutcome>,
     },
     Insert {
         code: String,
+        target_id: u64,
+        automatic: bool,
+        validity: WriteValidity,
         reply: Sender<InsertOutcome>,
     },
     Shutdown,
+}
+
+/// In-flight work must stop when its session is cancelled or its caller times out.
+pub(crate) struct WriteValidity {
+    pub active: Arc<AtomicBool>,
+    pub expires: Instant,
+}
+
+impl WriteValidity {
+    pub fn active(&self) -> bool {
+        self.active.load(Ordering::SeqCst) && Instant::now() < self.expires
+    }
+    pub fn focused(&self, automation: &IUIAutomation, target: &IUIAutomationElement) -> bool {
+        if !self.active() {
+            return false;
+        }
+        let matches = unsafe {
+            target
+                .CurrentHasKeyboardFocus()
+                .map(|v| v.as_bool())
+                .unwrap_or(false)
+                && automation
+                    .GetFocusedElement()
+                    .and_then(|current| automation.CompareElements(&current, target))
+                    .map(|v| v.as_bool())
+                    .unwrap_or(false)
+        };
+        matches && self.active()
+    }
 }
 
 /// 探测与写入的唯一入口。
@@ -71,10 +108,17 @@ impl UiaWorker {
     /// 探测当前焦点。
     ///
     /// 超时返回 [`ProbeOutcome::TimedOut`] —— 调用方当作"这次不给候选"处理。
-    pub fn probe(&self, timeout: Duration) -> ProbeOutcome {
+    pub fn probe(&self, code: &str, timeout: Duration) -> ProbeOutcome {
         let (reply, receiver) = mpsc::channel();
 
-        if self.commands.send(Command::Probe { reply }).is_err() {
+        if self
+            .commands
+            .send(Command::Probe {
+                code: code.into(),
+                reply,
+            })
+            .is_err()
+        {
             return ProbeOutcome::Failed("UIA 工作线程已经退出".to_string());
         }
 
@@ -89,12 +133,25 @@ impl UiaWorker {
 
     /// 把验证码写进**上一次探测到的**那个控件。
     ///
-    /// ★ 只应该在用户点击候选条时调用。
-    pub fn insert(&self, code: &str, timeout: Duration) -> InsertOutcome {
+    /// 手动点击或显式开启的自动模式调用；必须匹配目标、有效会话和超时。
+    pub fn insert(
+        &self,
+        code: &str,
+        target_id: u64,
+        automatic: bool,
+        active: Arc<AtomicBool>,
+        timeout: Duration,
+    ) -> InsertOutcome {
         let (reply, receiver) = mpsc::channel();
 
         let command = Command::Insert {
             code: code.to_string(),
+            target_id,
+            automatic,
+            validity: WriteValidity {
+                active,
+                expires: Instant::now() + timeout,
+            },
             reply,
         };
 
@@ -148,19 +205,52 @@ fn main(
 
     // 上一次探测到的元素 —— 用户点击时写的就是它
     let mut target: Option<IUIAutomationElement> = None;
+    let mut target_id = 0u64;
 
     while let Ok(command) = commands.recv() {
         match command {
-            Command::Probe { reply } => {
-                let result = probe::run(&automation, mode);
+            Command::Probe { code, reply } => {
+                let mut result = probe::run(&automation, mode, &code);
+                let same = match (&target, &result.element) {
+                    (Some(previous), Some(current)) => {
+                        unsafe { automation.CompareElements(previous, current) }
+                            .map(|v| v.as_bool())
+                            .unwrap_or(false)
+                    }
+                    _ => false,
+                };
+                if !same {
+                    target_id = target_id.wrapping_add(1);
+                }
+                if let ProbeOutcome::Found(ref mut focus) = result.outcome {
+                    focus.target_id = target_id;
+                }
                 target = result.element;
 
                 // 接收端可能已经超时走了，发失败也没关系
                 let _ = reply.send(result.outcome);
             }
 
-            Command::Insert { code, reply } => {
-                let outcome = insert::run(target.as_ref(), &code, mode, type_delay);
+            Command::Insert {
+                code,
+                target_id: expected,
+                automatic,
+                validity,
+                reply,
+            } => {
+                let outcome = if expected != target_id || !validity.active() {
+                    InsertOutcome::no("目标已改变或请求已取消，请手动粘贴")
+                } else {
+                    insert::run(
+                        &automation,
+                        target.as_ref(),
+                        &code,
+                        mode,
+                        type_delay,
+                        automatic,
+                        &validity,
+                    )
+                };
                 let _ = reply.send(outcome);
             }
 
@@ -170,5 +260,26 @@ fn main(
 
     if com.is_ok() {
         unsafe { CoUninitialize() };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn 超时或取消的排队请求失效() {
+        let active = Arc::new(AtomicBool::new(true));
+        let request = WriteValidity {
+            active: active.clone(),
+            expires: Instant::now() + Duration::from_secs(60),
+        };
+        assert!(request.active());
+        active.store(false, Ordering::SeqCst);
+        assert!(!request.active());
+        let expired = WriteValidity {
+            active: Arc::new(AtomicBool::new(true)),
+            expires: Instant::now(),
+        };
+        assert!(!expired.active());
     }
 }

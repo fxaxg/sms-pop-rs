@@ -16,7 +16,7 @@ export function resolveLang(setting: LanguageSetting): Lang {
 }
 
 const zh = {
-  ui: { back: "上一步", next: "下一步", done: "完成", shareTitle: "允许共享系统通知", verifyNote: "关闭引导后，在设备列表确认目标 iPhone。另一台已连接设备的通知不代表新设备已完成配对。", guideHelp: "确认两端蓝牙已开启、手机在附近；关闭此引导不会停止后台自动连接。", advanced: "高级选项", unset: "未设置", configured: (n: number) => `已设置 ${n} 项`, custom: "自定义来源", chooseSource: "通知来源", selectTemplate: "选择来源，配置点击后要打开的应用。", filterNote: "屏蔽规则优先。被过滤的通知不会弹出，也不会触发验证码复制或候选条。", copyHint: "收到验证码时复制，便于手动粘贴", caretHint: "仅点击“填入”时写入，不会自动输入", detect: "识别验证码", popups: "显示通知弹窗", popupHint: "关闭后，启用验证码识别时仍可显示验证码通知。", autoConnectOff: "自动连接已关闭" },
+  ui: { back: "上一步", next: "下一步", done: "完成", shareTitle: "允许共享系统通知", verifyNote: "关闭引导后，在设备列表确认目标 iPhone。另一台已连接设备的通知不代表新设备已完成配对。", guideHelp: "确认两端蓝牙已开启、手机在附近；关闭此引导不会停止后台自动连接。", advanced: "高级选项", unset: "未设置", configured: (n: number) => `已设置 ${n} 项`, custom: "自定义来源", chooseSource: "通知来源", selectTemplate: "选择来源，配置点击后要打开的应用。", filterNote: "屏蔽规则优先。被过滤的通知不会弹出，也不会触发验证码复制或候选条。", copyHint: "收到验证码时复制，便于手动粘贴", caretHint: "随焦点输入框移动；点击填入，× 取消这条验证码的后续提示", detect: "识别验证码", popups: "显示通知弹窗", popupHint: "关闭后，启用验证码识别时仍可显示验证码通知。", autoConnectOff: "自动连接已关闭" },
   rules: {
     title: "点击打开应用", desc: "按手机 App 标识匹配。仅点击通知时打开，不自动启动，也不定位到具体聊天。",
     wechat: "微信", mail: "邮件", add: "添加规则", empty: "选择上方模板配置目标应用，或添加自定义来源。",
@@ -146,21 +146,24 @@ const zh = {
   },
   otp: {
     title: "验证码增强",
-    desc: "自动识别通知里的验证码。绝不自动填入 —— 只有你点候选条，验证码才会写进输入框。",
+    desc: "识别通知里的验证码。默认点击候选条填入，也可选择开启自动填入。",
     enabled: "启用验证码增强",
     autoCopy: "自动复制到剪贴板",
     autoCopyHint: "收到验证码就复制，随时可以手动粘贴",
     caretTitle: "光标候选条",
-    caretDesc: "收到验证码时，如果光标正好在输入框里，光标旁会出现「填入」按钮。",
+    caretDesc: "在输入框旁显示验证码，点击填入。",
     caretEnabled: "启用光标候选条",
     caretDuration: "停留时长",
-    watchSeconds: "监听窗口",
-    watchSecondsHint: "收到验证码后，这段时间内点进输入框仍会弹出候选条",
+    watchSeconds: "监听时长",
+    watchSecondsHint: "收到验证码后，等待输入框的时间。",
     gap: "与光标间距",
     gapHint: "默认 24，给中文输入法的候选窗留位置",
-    insertionTitle: "填入方式",
+    insertionTitle: "验证码填入",
+    autoFill: "自动填入",
+    autoFillHint: "自动填入空输入框或补全验证码，每条只尝试一次。",
+    fillOff: "关闭", fillOffHint: "仍可识别和复制验证码。",
     insertionDesc: "绝大多数情况不用动这里。",
-    mode: "模式",
+    mode: "写入机制",
     modeHint: "直接填入不兼容时，可尝试模拟键盘",
     modeDirect: "直接填入（推荐）",
     modeSimulate: "模拟键盘（兼容模式）",
@@ -186,7 +189,7 @@ const zh = {
     version: "版本",
     versionText: (v: string) => `SmsPop v${v} · MIT License`,
     promise: "安全承诺",
-    promiseText: "验证码只在你点击候选条时填入；仅联网检查和下载更新，不上传任何通知内容。",
+    promiseText: "默认手动填入；自动填入需显式开启，每条验证码最多尝试一次。通知内容不上传。",
   },
   about: {
     contributors: "贡献者",
@@ -227,13 +230,14 @@ const zh = {
     filling: "填入中…",
     done: "✓ 已填入",
     failed: "填入失败",
+    dismiss: "不再提示此验证码",
   },
 };
 
 export type Dict = typeof zh;
 
 const en: Dict = {
-  ui: { back: "Back", next: "Next", done: "Done", shareTitle: "Allow notification sharing", verifyNote: "After closing setup, check the intended iPhone in the device list. Notifications from another connected phone do not verify the new device.", guideHelp: "Keep both devices nearby with Bluetooth on. Closing setup does not stop automatic connection.", advanced: "Advanced options", unset: "Not configured", configured: (n: number) => `${n} entries configured`, custom: "Custom source", chooseSource: "Notification source", selectTemplate: "Choose a source and the app to open on click.", filterNote: "Blocked entries take priority. Filtered notifications do not trigger popups, code copying or the candidate bar.", copyHint: "Copy received codes for manual pasting", caretHint: "Inserts only when you click Fill. Never fills automatically.", detect: "Recognize verification codes", popups: "Show notification popups", popupHint: "When disabled, code notifications may still appear if code recognition is enabled.", autoConnectOff: "Automatic connection off" },
+  ui: { back: "Back", next: "Next", done: "Done", shareTitle: "Allow notification sharing", verifyNote: "After closing setup, check the intended iPhone in the device list. Notifications from another connected phone do not verify the new device.", guideHelp: "Keep both devices nearby with Bluetooth on. Closing setup does not stop automatic connection.", advanced: "Advanced options", unset: "Not configured", configured: (n: number) => `${n} entries configured`, custom: "Custom source", chooseSource: "Notification source", selectTemplate: "Choose a source and the app to open on click.", filterNote: "Blocked entries take priority. Filtered notifications do not trigger popups, code copying or the candidate bar.", copyHint: "Copy received codes for manual pasting", caretHint: "Follows the focused field. Click Fill to insert; × dismisses this code for the remaining watch window.", detect: "Recognize verification codes", popups: "Show notification popups", popupHint: "When disabled, code notifications may still appear if code recognition is enabled.", autoConnectOff: "Automatic connection off" },
   rules: {
     title: "Open apps on click", desc: "Match the phone app ID. Opens only on click; does not navigate to a specific conversation.",
     wechat: "WeChat", mail: "Mail", add: "Add rule", empty: "Configure an app using a template above, or add a custom source.",
@@ -362,21 +366,24 @@ const en: Dict = {
   },
   otp: {
     title: "OTP assist",
-    desc: "Detects verification codes in notifications. Never auto-fills — the code is only written when you click the bar.",
+    desc: "Detects codes in notifications. Click the candidate bar by default, or explicitly enable automatic filling.",
     enabled: "Enable OTP assist",
     autoCopy: "Auto-copy to clipboard",
     autoCopyHint: "Copy codes so you can paste manually anytime",
     caretTitle: "Caret candidate bar",
-    caretDesc: "When a code arrives and the caret is in a text field, a \"Fill\" pill appears next to it.",
+    caretDesc: "Show the code beside the text field. Click to fill.",
     caretEnabled: "Enable candidate bar",
     caretDuration: "Bar duration",
     watchSeconds: "Watch window",
-    watchSecondsHint: "After a code arrives, the bar still appears if you click into a field within this time",
+    watchSecondsHint: "How long to wait for a text field after a code arrives.",
     gap: "Gap from caret",
     gapHint: "24 by default, leaving room for IME candidate windows",
-    insertionTitle: "Insertion",
+    insertionTitle: "Code insertion",
+    autoFill: "Automatic fill",
+    autoFillHint: "Fill an empty field or complete the code. One attempt per code.",
+    fillOff: "Off", fillOffHint: "Code recognition and copying remain available.",
     insertionDesc: "You almost never need to touch this.",
-    mode: "Mode",
+    mode: "Insertion mechanism",
     modeHint: "Try keyboard simulation if direct insertion is incompatible",
     modeDirect: "Direct insertion (recommended)",
     modeSimulate: "Keyboard simulation (compatibility)",
@@ -402,7 +409,7 @@ const en: Dict = {
     version: "Version",
     versionText: (v: string) => `SmsPop v${v} · MIT License`,
     promise: "Privacy",
-    promiseText: "Codes are only inserted when you click the bar. Network access is only used to check and download updates; notification content is never uploaded.",
+    promiseText: "Manual by default. Automatic filling requires explicit opt-in and attempts at most once per code. Notification content is not uploaded.",
   },
   about: {
     contributors: "Contributors",
@@ -443,6 +450,7 @@ const en: Dict = {
     filling: "Filling…",
     done: "✓ Filled",
     failed: "Insertion failed",
+    dismiss: "Dismiss this code",
   },
 };
 
