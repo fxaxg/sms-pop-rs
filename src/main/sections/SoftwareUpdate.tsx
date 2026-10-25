@@ -49,7 +49,6 @@ export function UpdateNotice({ updater }: { updater: Updater }) {
 export function UpdateDialog({ updater, beforeInstall }: { updater: Updater; beforeInstall: () => Promise<void> }) {
   const t = useT().updater;
   const { status, controller } = updater;
-  const [confirm, setConfirm] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const actions = updateActions(status, updater.busy);
   const openLink = async (url: string) => {
@@ -65,14 +64,10 @@ export function UpdateDialog({ updater, beforeInstall }: { updater: Updater; bef
       <progress aria-label={t.downloading} max={status.total ?? undefined} value={status.total ? status.downloaded : undefined} />
       <p className="hint-text">{size(status.downloaded)}{status.total ? ` / ${size(status.total)}` : ""}</p>
     </div>}
-    {confirm && actions.install && <p>{t.confirm}</p>}
     <footer className="modal-actions">
       {actions.check && <button className="btn" onClick={() => void controller.check()}>{t.check}</button>}
       {actions.download && <button className="btn primary" onClick={() => void controller.download()}>{t.download}</button>}
-      {actions.install && (!confirm
-        ? <button className="btn primary" onClick={() => setConfirm(true)}>{t.install}</button>
-        : <><button className="btn" onClick={() => setConfirm(false)}>{t.cancel}</button>
-          <button className="btn primary" onClick={() => void controller.install(beforeInstall)}>{t.confirmInstall}</button></>)}
+      {actions.install && <button className="btn primary" onClick={() => void controller.install(beforeInstall)}>{t.install}</button>}
     </footer>
   </Modal>;
 }
