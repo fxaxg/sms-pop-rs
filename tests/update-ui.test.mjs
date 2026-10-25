@@ -56,7 +56,9 @@ test("about keeps summary while dialog owns release notes, progress and actions"
   const dialog = render(UpdateDialog, { updater: update, beforeInstall: async () => {} });
   assert.match(dialog, /<dialog/); assert.match(dialog, /Unique release details/);
   assert.match(dialog, /下载更新/);
-  assert.match(render(UpdateDialog, { updater: updater("ready"), beforeInstall: async () => {} }), /安装并重启/);
+  const ready = render(UpdateDialog, { updater: updater("ready"), beforeInstall: async () => {} });
+  assert.match(ready, /安装并重启/);
+  assert.doesNotMatch(ready, /是否继续|确认安装/);
   assert.match(render(UpdateDialog, { updater: updater("available"), beforeInstall: async () => {} }), /此版本未提供更新说明/);
 });
 
