@@ -3,7 +3,7 @@
 //! 和直接 `SetValue` 不同，这条路**需要目标控件真正拿到焦点**：
 //! `SendInput` 把按键投进前台线程的输入队列，谁在前台谁就收到。
 //!
-//! 所以顺序是：聚焦目标 → 确认前台确实是目标 → 光标移到末尾 → 逐字键入。
+//! 所以顺序是：确认焦点仍是目标 → 光标移到末尾 → 逐字键入。
 //! 每敲一个字之前都重新确认一次前台，用户中途点到别处就立刻停手，
 //! 绝不让剩下的字符漏进别的窗口。
 //!
@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use log::{debug, info};
 use windows::Win32::UI::Accessibility::{
-    IUIAutomationElement, IUIAutomationTextPattern, TextPatternRangeEndpoint_End,
+    IUIAutomation, IUIAutomationElement, IUIAutomationTextPattern, TextPatternRangeEndpoint_End,
     TextPatternRangeEndpoint_Start, UIA_TextPatternId,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -25,24 +25,26 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 
+use crate::worker::WriteValidity;
 use crate::InsertOutcome;
 
 /// 聚焦 `element` 之后，把 `text` 逐字键入进去。
 ///
 /// `delay` 是每个字符之间的间隔；零表示不额外等待。
 pub(crate) fn type_text(
+    automation: &IUIAutomation,
     element: &IUIAutomationElement,
     text: &str,
     delay: Duration,
+    validity: &WriteValidity,
 ) -> InsertOutcome {
     if text.is_empty() {
         return InsertOutcome::no("没有可键入的内容");
     }
 
-    // 1) 聚焦目标。候选条本身是 NOACTIVATE 的，不会抢焦点，
-    //    但这里要主动把焦点放到输入框上（用户点击前焦点可能已经不在了）。
-    if unsafe { element.SetFocus() }.is_err() {
-        return InsertOutcome::no("目标不接受焦点，无法模拟键入");
+    // 1) 不主动夺回焦点；用户换到别的输入框就放弃这次请求。
+    if !validity.focused(automation, element) {
+        return InsertOutcome::no("焦点已改变或请求已取消，无法模拟键入");
     }
 
     // 给焦点切换和输入法状态一点时间
@@ -51,12 +53,15 @@ pub(crate) fn type_text(
     // 2) 安全闸：前台必须真的是目标进程，否则一个字符都不敲
     let pid = unsafe { element.CurrentProcessId() }.unwrap_or(0) as u32;
 
-    if pid == 0 || !foreground_is(pid) {
+    if pid == 0 || !foreground_is(pid) || !validity.focused(automation, element) {
         return InsertOutcome::no("目标不在前台，已放弃模拟键入");
     }
 
     // 3) 光标移到末尾（没有 TextPattern 就退一格 End 键）
     if !move_caret_to_end(element) {
+        if !validity.focused(automation, element) {
+            return InsertOutcome::no("焦点已改变，已停止模拟键入");
+        }
         debug!("目标没有 TextPattern，退回发送 End 键");
         tap_vk(VK_END);
         thread::sleep(Duration::from_millis(20));
@@ -67,7 +72,7 @@ pub(crate) fn type_text(
     let mut typed = 0usize;
 
     for unit in text.encode_utf16() {
-        if !foreground_is(pid) {
+        if !foreground_is(pid) || !validity.focused(automation, element) {
             return InsertOutcome::no(format!("焦点中途改变，已停止（{typed}/{total}）"));
         }
 
@@ -77,7 +82,7 @@ pub(crate) fn type_text(
 
         typed += 1;
 
-        if !delay.is_zero() {
+        if !delay.is_zero() && typed < total {
             thread::sleep(delay);
         }
     }

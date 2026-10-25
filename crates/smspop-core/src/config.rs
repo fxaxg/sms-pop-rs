@@ -117,10 +117,13 @@ pub struct OtpOptions {
     /// 收到验证码时自动复制到剪贴板。
     pub auto_copy: bool,
 
+    /// 显式开启后，在监听期内对首个合适的焦点输入框自动尝试一次。
+    pub auto_fill: bool,
+
     /// 光标候选条。
     pub caret: CaretOptions,
 
-    /// 点击候选条后的填入方式。
+    /// 写入机制，与手动/自动触发独立。
     pub insertion: InsertionOptions,
 }
 
@@ -129,6 +132,7 @@ impl Default for OtpOptions {
         Self {
             enabled: true,
             auto_copy: true,
+            auto_fill: false,
             caret: CaretOptions::default(),
             insertion: InsertionOptions::default(),
         }
@@ -196,7 +200,7 @@ impl Default for CaretOptions {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum InsertMode {
-    /// 直接 `SetValue`：快，且不要求目标控件有焦点。
+    /// 直接 `SetValue`：快速写入；执行层仍须验证当前焦点。
     #[default]
     Direct,
 
@@ -345,6 +349,9 @@ pub const DEFAULT_CONFIG_JSON: &str = r#"{
     "enabled": true,
     // 收到验证码时自动复制到剪贴板
     "auto_copy": true,
+    // 默认关闭。开启后在监听期内对首个可读、非密码、空白或验证码前缀输入框尝试一次。
+    // 自动填入与手动候选条互斥；失败后可从通知复制或手动粘贴。
+    "auto_fill": false,
 
     // 光标候选条：收到验证码时，如果光标正好在一个可写输入框里，
     // 会在光标旁冒出一条「填入 868740」。**只有你点它才会写进去**。
@@ -359,8 +366,7 @@ pub const DEFAULT_CONFIG_JSON: &str = r#"{
       "gap": 24.0
     },
 
-    // 点候选条之后，验证码怎么进输入框。两种模式都会**追加**到已有内容
-    // 后面（除非内容本身就是验证码）；如果已经手打了前几位，会补全。
+    // 写入机制，与自动/手动触发独立。手动允许追加，自动仅填空白或补全前缀。
     "insertion": {
       // direct   = 直接写入（快，不碰焦点，绝大多数输入框都适用）
       // simulate = 模拟键盘逐字键入（慢，需要目标可聚焦）
@@ -475,6 +481,7 @@ mod tests {
         assert!(config.notifications.enabled);
         assert!(config.otp.enabled);
         assert!(config.otp.auto_copy);
+        assert!(!config.otp.auto_fill);
         assert!(config.otp.caret.enabled);
         assert_eq!(config.otp.caret.gap, 24.0);
         assert_eq!(config.otp.insertion.mode, InsertMode::Direct);
@@ -536,6 +543,19 @@ mod tests {
     #[test]
     fn 空对象得到全默认值() {
         assert_eq!(Config::from_json_str("{}").unwrap(), Config::default());
+    }
+
+    #[test]
+    fn 旧配置不会自动开启填入且新设置能往返() {
+        let old = Config::from_json_str(r#"{"otp":{"auto_copy":true,"caret":{"enabled":true}}}"#)
+            .unwrap();
+        assert!(!old.otp.auto_fill);
+        let mut config = old;
+        config.otp.auto_fill = true;
+        assert_eq!(
+            Config::from_json_str(&config.to_json_string()).unwrap(),
+            config
+        );
     }
 
     #[test]

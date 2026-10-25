@@ -235,9 +235,8 @@ fn dispatch_with_policy(
         popups::show(app, &notification);
     }
 
-    // ③ 光标候选条（点了才填入）。
-    //    开 N 秒监听窗：等焦点落进输入框再弹，而不是只认到达瞬间。
-    if offer_otp && config.otp.caret.enabled {
+    // ③ 可选自动填入或手动候选条，两者互斥，共用有期限的监听会话。
+    if offer_otp && (config.otp.auto_fill || config.otp.caret.enabled) {
         if let Some(code) = notification.code.clone() {
             caret::watch(app, code, notification.otp_source_hint());
         }

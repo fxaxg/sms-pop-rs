@@ -1,43 +1,56 @@
 //! 把验证码真正写进目标控件。
 //!
 //! ★ 这是**整个项目里唯一会改动别人内容**的地方，
-//!   而且它只在**用户点击候选条**之后才会被调用。
-//!   没有任何自动路径会走到这里 —— 没有定时器，没有后台任务。
+//!   默认由点击候选条触发。显式开启的自动路径仅尝试一次，且不盲写或追加普通文本。
 //!
 //! 两种机制：
 //!
 //! * `direct`（默认）—— `IUIAutomationValuePattern::SetValue` 整体写入。
-//!   它**不要求控件当时有焦点**，所以候选条被点击（哪怕焦点被动了）也照样写得进去。
-//! * `simulate` —— 聚焦目标后用 [`crate::typing`] 逐字敲键盘。
+//!   写入前仍检查目标身份、焦点和会话，避免对旧控件写入。
+//! * `simulate` —— 对当前焦点目标用 [`crate::typing`] 逐字敲键盘，不主动夺回焦点。
 //!   适合那些对 `SetValue` 不生效的输入框；代价是需要焦点、也更慢。
 //!
-//! 两条路都先经过 [`smspop_core::insertion::plan`] 决定"写什么"。
+//! 手动使用 [`smspop_core::insertion::plan`]，自动使用更保守的 plan_automatic。
 
 use std::time::Duration;
 
 use log::{info, warn};
 use windows::core::BSTR;
 use windows::Win32::UI::Accessibility::{
-    IUIAutomationElement, IUIAutomationValuePattern, UIA_ValuePatternId,
+    IUIAutomation, IUIAutomationElement, IUIAutomationValuePattern, UIA_ValuePatternId,
 };
 
 use smspop_core::config::InsertMode;
 use smspop_core::insertion;
 
+use crate::worker::WriteValidity;
 use crate::{typing, InsertOutcome};
 
 /// 往 `element` 里写 `code`。
 ///
 /// `element` 是上一次探测留下的目标；为 `None` 说明从来没探测成功过。
 pub(crate) fn run(
+    automation: &IUIAutomation,
     element: Option<&IUIAutomationElement>,
     code: &str,
     mode: InsertMode,
     type_delay: Duration,
+    automatic: bool,
+    validity: &WriteValidity,
 ) -> InsertOutcome {
     let Some(element) = element else {
         return InsertOutcome::no("目标已失效，请手动粘贴");
     };
+    if !validity.focused(automation, element) {
+        return InsertOutcome::no("焦点已改变或请求已取消，请手动粘贴");
+    }
+    if automatic
+        && unsafe { element.CurrentIsPassword() }
+            .map(|v| v.as_bool())
+            .unwrap_or(true)
+    {
+        return InsertOutcome::no("不向密码框填入验证码");
+    }
 
     if code.is_empty() {
         return InsertOutcome::no("没有可用的验证码");
@@ -74,7 +87,11 @@ pub(crate) fn run(
         .and_then(|pattern| unsafe { pattern.CurrentValue() }.ok())
         .map(|value| value.to_string());
 
-    let plan = insertion::plan(current.as_deref(), Some(code));
+    let plan = if automatic {
+        insertion::plan_automatic(current.as_deref(), Some(code))
+    } else {
+        insertion::plan(current.as_deref(), Some(code))
+    };
 
     if !plan.should_write() {
         // 日志里只有原因，没有内容
@@ -90,6 +107,10 @@ pub(crate) fn run(
             };
 
             let value = plan.value.unwrap_or_default();
+
+            if !validity.focused(automation, element) {
+                return InsertOutcome::no("焦点已改变或请求已取消，请手动粘贴");
+            }
 
             match unsafe { pattern.SetValue(&BSTR::from(value.as_str())) } {
                 Ok(()) => {
@@ -109,7 +130,7 @@ pub(crate) fn run(
             // 补全时只敲缺的那几位；追加时是整段验证码
             let typed = plan.typed.unwrap_or_else(|| code.to_string());
 
-            typing::type_text(element, &typed, type_delay)
+            typing::type_text(automation, element, &typed, type_delay, validity)
         }
     }
 }
