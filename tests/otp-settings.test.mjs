@@ -22,33 +22,49 @@ function render({ auto = false, enabled = true, candidate = true, mode = "direct
     createElement(Otp, { config, update() {} })));
 }
 
-test("manual selection remains enabled when automatic filling is off", () => {
+const radios = (html) => [...html.matchAll(/<input\b([^>]*)>/g)]
+  .map((match) => match[1]).filter((attributes) => attributes.includes('type="radio"'));
+const checkedMode = (html) => radios(html).find((attributes) => attributes.includes("checked="))?.match(/value="([^"]+)"/)?.[1];
+
+test("candidate mode is selected by default and shows its settings", () => {
   const html = render();
-  const selects = [...html.matchAll(/<select\b([^>]*)>/g)];
-  assert.equal(selects.length, 2);
-  assert.doesNotMatch(selects[0][1], /disabled/);
-  assert.match(html, /value="candidate" selected/);
-  assert.match(html, /自动填入输入框/);
+  assert.equal(radios(html).length, 3);
+  assert.equal(checkedMode(html), "candidate");
+  assert.match(html, /role="radiogroup"/);
+  assert.match(html, /在输入框旁显示验证码，点击填入/);
+  assert.match(html, /停留时长/);
+  assert.match(html, /与光标间距/);
+  assert.match(html, /监听时长/);
+  assert.match(html, /写入机制/);
+  assert.doesNotMatch(html, /手动填入入口|自动填入输入框/);
 });
 
-test("automatic filling disables manual selection but keeps writing methods available", () => {
-  const html = render({ auto: true, candidate: false, mode: "simulate" });
+test("automatic mode takes precedence for existing settings and hides candidate-only fields", () => {
+  const html = render({ auto: true, candidate: true, mode: "simulate" });
   const selects = [...html.matchAll(/<select\b([^>]*)>/g)];
-  assert.match(selects[0][1], /disabled/);
-  assert.doesNotMatch(selects[1][1], /disabled/);
-  assert.match(html, /value="disabled" selected/); // preserve the previous manual choice
+  assert.equal(selects.length, 1); // only the writing mechanism remains a dropdown
+  assert.doesNotMatch(selects[0][1], /disabled/);
+  assert.equal(checkedMode(html), "automatic");
   assert.match(html, /value="simulate" selected/);
   assert.match(html, /逐字间隔/);
-  assert.match(html, /监听窗口/);
-  assert.match(html, /关闭自动填入后恢复原选择/);
+  assert.match(html, /监听时长/);
+  assert.match(html, /每条只尝试一次/);
+  assert.doesNotMatch(html, /停留时长|与光标间距/);
+});
+
+test("off mode hides insertion parameters while keeping recognition and copying controls", () => {
+  const html = render({ auto: false, candidate: false });
+  assert.equal(checkedMode(html), "off");
+  assert.match(html, /仍可识别和复制验证码/);
+  assert.match(html, /识别验证码/);
+  assert.match(html, /自动复制到剪贴板/);
+  assert.doesNotMatch(html, /监听时长|写入机制|停留时长|与光标间距|高级选项/);
 });
 
 test("disabled OTP assist retains choices and disables its controls; English labels render", () => {
   const html = render({ auto: true, enabled: false, lang: "en" });
-  assert.match(html, /Automatically fill text fields/);
-  assert.match(html, /Writing method/);
-  const firstSelect = html.match(/<select\b([^>]*)>/);
-  assert.match(firstSelect[1], /disabled/);
-  assert.match(html, /<fieldset[^>]*disabled/);
-  assert.match(html, /value="candidate" selected/);
+  assert.match(html, /Automatic fill/);
+  assert.match(html, /Insertion mechanism/);
+  assert.match(html, /<fieldset[^>]*role="radiogroup"[^>]*disabled/);
+  assert.equal(checkedMode(html), "automatic");
 });
