@@ -10,6 +10,10 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    watch: {
+      // Cargo 在工作区根目录生成 DLL，避免监听编译产物触发 Windows 文件锁错误。
+      ignored: ["**/target/**"],
+    },
   },
   build: {
     // 三个窗口入口：主设置窗 / toast 弹窗 / 光标候选条
