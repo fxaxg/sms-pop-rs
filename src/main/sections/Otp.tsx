@@ -37,7 +37,7 @@ export function Otp({ config, update }: Props) {
         </Row>
       </Section>
 
-      <Section title={t.otp.insertionTitle}>
+      <Section title={t.otp.insertionTitle} action={
         <fieldset className="otp-fill-options" role="radiogroup" aria-label={t.otp.insertionTitle}
           aria-describedby={`${groupId}-hint`} disabled={!otp.enabled}>
           {fillOptions.map((option) => <label key={option.value} className="otp-fill-option">
@@ -49,6 +49,7 @@ export function Otp({ config, update }: Props) {
             <span>{option.label}</span>
           </label>)}
         </fieldset>
+      }>
         <p className="otp-fill-hint" id={`${groupId}-hint`}>{fillOptions.find((option) => option.value === fillMode)?.hint}</p>
         {fillMode === "candidate" && <fieldset className="settings-fields" disabled={!otp.enabled}>
         <Row label={t.otp.caretDuration}>
