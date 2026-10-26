@@ -18,7 +18,7 @@ https://github.com/user-attachments/assets/ac2c4289-9e66-47c9-bec0-208e82811a7e
 ## 它能做什么
 
 - **接收手机通知**：在屏幕右下角显示 iPhone 通知。
-- **HTTP 网络接入**：接收 SmsForwarder 或快捷指令转发的短信与通知，复制统一令牌链接即可使用 GET / POST 接入，见 [接入指南](docs/http-ingress.md)。
+- **HTTP 网络接入**：接收 SmsForwarder 或快捷指令转发的短信与通知，复制统一令牌链接即可使用 GET / POST 接入，见 [接入指南](website/guide/network.md)。
 - **使用验证码**：识别并复制验证码；候选条随输入框切换并重置停留时间，关闭后不再提示该条验证码。也可显式开启自动填入（默认关闭），监听期内只对首个合适输入框尝试一次。
 - **点击打开应用**：按通知来源配置 URL 规则，例如 `weixin://`、`tencent://` 或固定 HTTPS 链接。
 - **后台自动恢复**：手机离开后自动重试连接，返回后重建失效的通知会话。
@@ -71,6 +71,14 @@ https://github.com/user-attachments/assets/ac2c4289-9e66-47c9-bec0-208e82811a7e
 
 ## 开发
 
+### 官网与文档
+
+网站源码位于 `website/`，独立于桌面应用构建。运行 `npm --prefix website ci` 安装依赖，
+运行 `npm --prefix website run dev` 本地预览。内容维护、CI 范围与 GitHub Pages 发布设置见
+[网站说明](website/README.md)。
+
+### 桌面应用
+
 需要 Rust stable（MSVC 工具链）、Node.js 22、Visual Studio Build Tools 的 C++ 工作负载，以及 WebView2。
 
 ```powershell
@@ -91,7 +99,7 @@ npm run tauri build
 
 Windows 安装包输出到 `target/release/bundle/nsis/`。应用图标源文件位于 `src/shared/app-icon.svg`。
 
-打包时需要配置更新签名环境变量；密钥配置、版本同步和草稿发布步骤见 [发版说明](docs/releases.md)。
+打包时需要配置更新签名环境变量；密钥配置、版本同步和草稿发布步骤见 [发版说明](website/development/releases.md)。
 
 ### 项目结构
 
