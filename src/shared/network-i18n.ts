@@ -20,7 +20,7 @@ const zh = {
   genericHint: "POST 到接收地址，增加 Authorization 请求头与 Content-Type: application/json。每条消息使用唯一 message_id，重试沿用原值。",
   androidHint: "Webhook 选择 POST，添加 Authorization 请求头。Content-Type 使用 application/x-www-form-urlencoded，填写以下参数；通知规则另加 kind=notification。",
   iosHint: "收到信息自动化 → 获取输入消息 → 获取 URL 内容 → POST JSON。使用字典填写 body、sender，并增加 Authorization 请求头。立即运行、锁屏及网络权限需按 iOS 版本验证。",
-  publicHint: "公网请将 HTTPS 代理指向仅本机监听地址，不要直接映射明文 HTTP 端口。代理需限制连接数和超时；详情见 docs/http-ingress.md。",
+  publicHint: "公网请将 HTTPS 代理指向仅本机监听地址，不要直接映射明文 HTTP 端口。代理需限制连接数和超时；详情见 website/guide/network.md。",
   refreshError: "无法刷新服务状态", retry: "重试", clipboardError: "复制失败，请重试。", requestError: "操作失败", busy: "处理中…",
 };
 type NetworkDict = typeof zh;
@@ -45,7 +45,7 @@ const en: NetworkDict = {
   genericHint: "POST to the endpoint with Authorization and Content-Type: application/json. Use a unique message_id per message and reuse it for retries.",
   androidHint: "Select POST in Webhook, add Authorization, and use application/x-www-form-urlencoded with these parameters. Add kind=notification for notification rules.",
   iosHint: "Message automation → Get input message → Get Contents of URL → POST JSON. Use dictionary fields for body and sender, plus Authorization. Test immediate execution, lock-screen behavior and network permissions on your iOS version.",
-  publicHint: "Point your HTTPS proxy at the loopback endpoint. Never publish a plaintext HTTP port. Limit connections and timeouts at the proxy; see docs/http-ingress.md.",
+  publicHint: "Point your HTTPS proxy at the loopback endpoint. Never publish a plaintext HTTP port. Limit connections and timeouts at the proxy; see website/guide/network.md.",
   refreshError: "Could not refresh receiver status", retry: "Retry", clipboardError: "Copy failed. Please retry.", requestError: "Operation failed", busy: "Working…",
 };
 export const networkDict = { zh, en };
