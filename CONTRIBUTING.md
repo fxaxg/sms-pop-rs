@@ -42,4 +42,4 @@ CI 不能替代蓝牙、配对、休眠、多屏 DPI 或输入框的真机验证
 - URL 打开规则与独立复制按钮。
 - 浅深色、窗口缩放、托盘、候选条边界与 DPI。
 
-发版时同步 `Cargo.toml`、`package.json` 和 `src-tauri/tauri.conf.json` 的版本，检查 lockfile，并编写发布说明。当前 CI 只负责检查，不会自动发布安装包。
+发版时同步 `Cargo.toml`、`package.json` 和 `src-tauri/tauri.conf.json` 的版本，检查 lockfile，并编写发布说明。完整流程见 [Windows 更新与发版](website/development/releases.md)；发布工作流会生成草稿 Release，由维护者验收后公开发布。

@@ -15,8 +15,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect application changes
+    runs-on: ubuntu-latest
+    outputs:
+      application: ${{ steps.scope.outputs.application }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Determine check scope
+        id: scope
+        run: node scripts/ci-changes.mjs
+
   windows-checks:
     name: Windows checks
+    needs: changes
+    if: needs.changes.outputs.application == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -44,3 +63,22 @@ jobs:
         run: cargo test --workspace --locked
       - name: Rust lint
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+  result:
+    name: CI result
+    if: always()
+    needs: [changes, windows-checks]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required checks
+        env:
+          SCOPE_RESULT: ${{ needs.changes.result }}
+          APPLICATION: ${{ needs.changes.outputs.application }}
+          WINDOWS_RESULT: ${{ needs.windows-checks.result }}
+        run: |
+          test "$SCOPE_RESULT" = success
+          if [ "$APPLICATION" = true ]; then
+            test "$WINDOWS_RESULT" = success
+          else
+            test "$WINDOWS_RESULT" = skipped
+          fi
